@@ -50,7 +50,10 @@ class RideSimTest {
                 if (crashTimer > 2) {
                     crashes++
                     println("  crash #%d at %.0f m: %s (%s)".format(crashes, tracker.along, bike.crash, bike.surfaceF))
-                    bike.reset(safeX, safeY, safeH); crashTimer = 0.0
+                    val p = DoubleArray(3); val q = DoubleArray(3)
+                    world.route.pointAt((tracker.along - 12).coerceAtLeast(0.0), p); world.route.pointAt((tracker.along - 6).coerceAtLeast(0.0), q)
+                    if (tracker.offRoute < 60) bike.reset(p[0], p[1], kotlin.math.atan2(q[1] - p[1], q[0] - p[0])) else bike.reset(safeX, safeY, safeH)
+                    crashTimer = 0.0
                 }
             } else {
                 safeTimer += dt

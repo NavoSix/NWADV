@@ -21,11 +21,11 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
         val u = ui.u
         ui.begin()
         ui.text("NORTHWOODS ADV", u * 3, ui.h - u * 2.5f, Color(0.95f, 0.6f, 0.2f, 1f), Align.left, ui.big)
-        ui.text("Ride your club's routes on real New Hampshire roads and terrain", u * 3, ui.h - u * 9.5f, Color.LIGHT_GRAY)
+        ui.text("Ride your club's routes on real New Hampshire roads and terrain", u * 3, ui.h - u * 8.5f, Color.LIGHT_GRAY)
 
         // Routes.
         val colW = ui.w * 0.48f
-        var y = ui.h - u * 15f
+        var y = ui.h - u * 17f
         val bh = u * 4.6f
         if (ui.button(if (picking) "Waiting for file picker..." else "Load GPX file...", u * 3, y, colW, bh, enabled = !picking)) {
             picking = true
@@ -50,16 +50,19 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
 
         // Settings.
         val sx = ui.w * 0.56f; val sw = ui.w * 0.40f
-        var sy = ui.h - u * 15f
-        val sh = u * 4f
+        var sy = ui.h - u * 17f
+        val sh = u * 5.2f
+        var col = 0
+        val tw = (sw - u) / 2
         fun toggle(label: String, value: String, onClick: () -> Unit) {
-            if (ui.button("$label: $value", sx, sy, sw, sh)) { onClick(); s.save() }
-            sy -= sh + u * 0.8f
+            if (ui.button("$label\n$value", sx + col * (tw + u), sy, tw, sh)) { onClick(); s.save() }
+            col++
+            if (col == 2) { col = 0; sy -= sh + u * 0.8f }
         }
         val a = s.assists
         toggle("Steering", a.steerMode.label) { a.steerMode = if (a.steerMode == SteerMode.LEAN) SteerMode.COUNTERSTEER else SteerMode.LEAN }
-        if (game.platform.isTouchDevice) toggle("Tilt to steer", if (s.tiltSteering) "On" else "Off (touch strip)") { s.tiltSteering = !s.tiltSteering }
-        toggle("ABS", when { a.absFront && a.absRear -> "On"; a.absFront -> "Front only (off-road)"; else -> "Off" }) {
+        if (game.platform.isTouchDevice) toggle("Tilt to steer", if (s.tiltSteering) "On" else "Off") { s.tiltSteering = !s.tiltSteering }
+        toggle("ABS", when { a.absFront && a.absRear -> "On"; a.absFront -> "Front only"; else -> "Off" }) {
             when {
                 a.absFront && a.absRear -> a.absRear = false
                 a.absFront -> a.absFront = false
@@ -68,13 +71,13 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
         }
         toggle("Traction control", if (a.tractionControl) "On" else "Off") { a.tractionControl = !a.tractionControl }
         toggle("Wheelie control", if (a.wheelieControl) "On" else "Off") { a.wheelieControl = !a.wheelieControl }
-        toggle("Gears", if (a.autoShift) "Auto shift" else "Manual (Q/E or buttons)") { a.autoShift = !a.autoShift }
-        toggle("Low-speed balance", if (a.lowSpeedBalance) "Feet down helper" else "Off") { a.lowSpeedBalance = !a.lowSpeedBalance }
+        toggle("Gears", if (a.autoShift) "Auto shift" else "Manual") { a.autoShift = !a.autoShift }
+        toggle("Walking pace", if (a.lowSpeedBalance) "Feet down" else "Off") { a.lowSpeedBalance = !a.lowSpeedBalance }
         toggle("Season", if (s.season == Season.FALL) "Fall foliage" else "Summer") { s.season = if (s.season == Season.FALL) Season.SUMMER else Season.FALL }
-        toggle("Units", if (s.imperial) "Miles / feet" else "Kilometres / metres") { s.imperial = !s.imperial }
+        toggle("Units", if (s.imperial) "Imperial" else "Metric") { s.imperial = !s.imperial }
 
         message?.let { ui.text(it, u * 3, u * 5.5f, Color(1f, 0.5f, 0.4f, 1f), Align.left, ui.font, ui.w - u * 6, true) }
-        ui.text("Map data © OpenStreetMap contributors (ODbL).  Elevation: USGS 3DEP via AWS Terrain Tiles.", u * 3, u * 2.2f, Color.DARK_GRAY)
+        ui.text("Map data (c) OpenStreetMap contributors (ODbL). Elevation: USGS 3DEP via AWS Terrain Tiles.", u * 3, u * 2.6f, Color.DARK_GRAY)
         ui.endFrame()
     }
 }

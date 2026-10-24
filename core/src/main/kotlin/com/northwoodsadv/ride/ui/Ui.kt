@@ -76,7 +76,7 @@ class Ui : InputAdapter(), Disposable {
         shapes.begin(ShapeRenderer.ShapeType.Line)
         shapes.color = BORDER; shapes.rect(x, y, bw, bh)
         shapes.end()
-        layout.setText(font, label)
+        layout.setText(font, label, Color.WHITE, bw, Align.center, false)
         text(label, x, y + bh / 2 + layout.height / 2, if (enabled) Color.WHITE else Color.GRAY, Align.center, font, bw)
         return enabled && clicked(x, y, bw, bh)
     }

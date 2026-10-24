@@ -10,3 +10,4 @@ captures/
 *.apk
 *.keystore
 tools/sample-routes/.dem-cache/
+/assets/saved-routes/

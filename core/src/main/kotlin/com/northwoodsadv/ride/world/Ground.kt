@@ -274,13 +274,13 @@ object RoadFeatures {
         // Embedded rocks ("baby heads").
         if (rough > 0.3) {
             val ci = floor(s / 1.3).toInt(); val cj = floor(lat / 0.9).toInt()
-            val density = 0.55 * (rough - 0.3) / 0.7 + if (ag > 0.1) 0.1 else 0.0
+            val density = 0.4 * (rough - 0.3) / 0.7 + if (ag > 0.1) 0.06 else 0.0
             var bump = 0.0
             for (di in -1..1) for (dj in -1..1) {
                 val i = ci + di; val j = cj + dj
                 if (Noise.rand(i, j, seed + 4) >= density) continue
                 val rx = (i + Noise.rand(i, j, seed + 5)) * 1.3; val ry = (j + Noise.rand(i, j, seed + 6)) * 0.9
-                val rad = 0.12 + 0.30 * rough * Noise.rand(i, j, seed + 7)
+                val rad = 0.10 + 0.24 * rough * Noise.rand(i, j, seed + 7) * Noise.rand(i, j, seed + 8)
                 val d2 = ((s - rx) * (s - rx) + (lat - ry) * (lat - ry)) / (rad * rad)
                 if (d2 < 1) {
                     val b = rad * 0.75 * (1 - d2).let { it * sqrt(it) }
@@ -298,7 +298,7 @@ object RoadFeatures {
             val sk = (k + 0.3 + 0.4 * Noise.rand(k, 9, seed)) * spacing
             val u = s - sk - lat * 0.55
             val up = if (grade > 0) 1.0 else -1.0
-            out.height += 0.28 * (0.5 + rough) * gauss(u / 0.55) - 0.18 * gauss((u - up * 0.9) / 0.45)
+            out.height += 0.2 * (0.4 + rough) * gauss(u / 0.6) - 0.12 * gauss((u - up * 0.9) / 0.45)
         }
 
         // Mud holes in flat, low spots.
@@ -308,7 +308,7 @@ object RoadFeatures {
         if (wetSpot > 0) {
             val m = minOf(1.0, wetSpot / 0.2)
             val lt = (lat / (half + 0.3)).coerceIn(-1.0, 1.0)
-            val depth = 0.3 * m * (1 - lt * lt)
+            val depth = 0.22 * m * (1 - lt * lt)
             out.height -= depth
             out.surface = Surface.MUD
             if (m > 0.6 && abs(lat) < half * 0.75) { out.puddle = true; out.waterDepth = depth * 0.6 }

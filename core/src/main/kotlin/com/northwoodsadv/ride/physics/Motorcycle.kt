@@ -590,6 +590,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
      */
     private fun riderSteer(input: RiderInput, a: Assists, u: Double, dt: Double): Double {
         val m = spec.mass
+        var falling = false
         val tanL = tan(lean.coerceIn(-1.3, 1.3))
         val k2 = if (standing) 8.5 else 7.1
         val ay = when (a.steerMode) {
@@ -602,7 +603,9 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
                 leanErrInt = (leanErrInt + err * dt) * exp(-dt * 0.6)
                 leanErrInt = leanErrInt.coerceIn(-0.5, 0.5)
                 // A smooth rider doesn't ask more of the front tyre than the surface offers.
-                val corrMax = 0.45 * sampleF.surface.mu * G
+                // Falling further from the requested lean: use whatever grip it takes to save it.
+                falling = err * lean > 0 && abs(err) > 0.08
+                val corrMax = (if (falling) 0.9 else 0.45) * sampleF.surface.mu * G
                 G * tanL + (18.7 * err + 8.0 * leanErrInt).coerceIn(-corrMax, corrMax) +
                     (k2 * leanRate).coerceIn(-1.6 * corrMax, 1.6 * corrMax)
             }
@@ -616,7 +619,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val cap = max(surf.mu * max(fzFrontFilt, 0.35 * m * G * spec.cgToRear / spec.wheelbase), 1.0)
         // Deliberately using more than ~80% of the front is what makes riders crash; the virtual
         // rider won't (the player can still exceed it by asking for more lean than grip allows).
-        val yN = (abs(fFrontCmd) / cap).coerceAtMost(if (abs(G * tanL) > 0.75 * surf.mu * G) 0.97 else 0.8)
+        val yN = (abs(fFrontCmd) / cap).coerceAtMost(if (falling || abs(G * tanL) > 0.75 * surf.mu * G) 0.97 else 0.8)
         val sN = 1 - sqrt(1 - yN)
         val corneringPerRad = 2 * surf.mu / tanPeak
         val camberEq = spec.camberStiffness * (surf.mu / 1.05).coerceAtMost(1.0) * sin(lean) / corneringPerRad

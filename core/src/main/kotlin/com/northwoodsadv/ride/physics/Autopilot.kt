@@ -50,7 +50,7 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
             val mu = gs.surface.mu
             val kindMax = when (road?.spec?.kind) {
                 RoadKind.HIGHWAY -> 27.0; RoadKind.MAJOR -> 23.0; RoadKind.MINOR -> 19.0; RoadKind.SERVICE -> 8.0
-                RoadKind.GRAVEL -> 15.0; RoadKind.CLASS_VI -> 4.0 + 4.0 * (1 - road.spec.roughness); RoadKind.TRAIL -> 4.0
+                RoadKind.GRAVEL -> 15.0; RoadKind.CLASS_VI -> 3.5 + 4.0 * (1 - road.spec.roughness); RoadKind.TRAIL -> 4.0
                 null -> 6.0
             }
             val k = curvatureAt(s)

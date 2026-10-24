@@ -70,7 +70,7 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
 class RouteLibrary(private val game: NwadvGame) {
     class Entry(val title: String, val load: () -> String, val bundled: Boolean)
 
-    private val dir get() = Gdx.files.local("routes")
+    private val dir get() = Gdx.files.local("saved-routes")
 
     fun entries(): List<Entry> {
         val out = ArrayList<Entry>()
@@ -81,7 +81,7 @@ class RouteLibrary(private val game: NwadvGame) {
     }
 
     fun remember(name: String, contents: String) {
-        if (BUNDLED.any { contents.length > 0 && it.first == name }) return
+        if (BUNDLED.any { it.first == name || it.second == name.removeSuffix(".gpx") }) return
         val safe = name.replace(Regex("[^A-Za-z0-9 ._-]"), "_").removeSuffix(".gpx").take(60)
         try { dir.child("$safe.gpx").writeString(contents, false, "UTF-8") } catch (_: Exception) {}
     }

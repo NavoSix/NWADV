@@ -26,7 +26,7 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
         for (i in 0 until n) { line.pointAt(i * STEP, tmp); raw[i] = elevation.height(tmp[0], tmp[1]) }
         val window = when (spec.kind) {
             RoadKind.HIGHWAY -> 70.0; RoadKind.MAJOR -> 55.0; RoadKind.MINOR -> 40.0
-            RoadKind.SERVICE -> 24.0; RoadKind.GRAVEL -> 28.0; RoadKind.CLASS_VI -> 14.0; RoadKind.TRAIL -> 10.0
+            RoadKind.SERVICE -> 24.0; RoadKind.GRAVEL -> 30.0; RoadKind.CLASS_VI -> 24.0; RoadKind.TRAIL -> 16.0
         }
         var smooth = boxFilter(boxFilter(raw, (window / STEP / 2).toInt()), (window / STEP / 2).toInt())
         if (spec.bridge || spec.tunnel) {

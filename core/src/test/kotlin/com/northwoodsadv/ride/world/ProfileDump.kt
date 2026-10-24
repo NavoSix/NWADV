@@ -15,11 +15,12 @@ class ProfileDump {
         val road = world.roads[0]
         val gs = GroundSample()
         val tmp = DoubleArray(3)
-        var s = 0.0
-        val lim = (System.getenv("NWADV_PROFILE_LEN") ?: "200").toDouble()
+        var s = (System.getenv("NWADV_PROFILE_FROM") ?: "0").toDouble()
+        val lim = s + (System.getenv("NWADV_PROFILE_LEN") ?: "200").toDouble()
         while (s < lim) {
             road.line.pointAt(s, tmp)
             world.ground.sample(tmp[0], tmp[1], gs)
+            val grade = road.gradeAt(s)
             println("s=%5.0f dem=%7.2f road=%7.2f grade=%5.1f%% ground=%7.2f %s".format(s, world.ground.elevation.height(tmp[0], tmp[1]), road.heightAt(s), road.gradeAt(s) * 100, gs.height, gs.surface))
             s += 5
         }

@@ -33,7 +33,7 @@ object Tire {
      * @param grip multiplier on surface friction (bodywork dragging, tyre wear...)
      */
     fun forces(fz: Double, kappa: Double, tanAlpha: Double, camber: Double, camberStiffness: Double,
-               surface: Surface, grip: Double, nominalLoad: Double, out: Result): Result {
+               surface: Surface, grip: Double, nominalLoad: Double, out: Result, lateralGrip: Double = 1.0): Result {
         if (fz <= 0) { out.fx = 0.0; out.fy = 0.0; out.utilisation = 0.0; out.dFxdKappa = 0.0; return out }
         val mu = surface.mu * grip * (1 - 0.08 * (fz / nominalLoad - 1)).coerceIn(0.75, 1.1)
         val tanPeak = tan(Math.toRadians(surface.anglePeakDeg))
@@ -46,7 +46,7 @@ object Tire {
         if (s < 1e-9) { out.fx = 0.0; out.fy = 0.0; out.utilisation = 0.0; out.dFxdKappa = 2 * mu * fz / surface.slipPeak; return out }
         val f = mu * fz * curve(s, surface.slideRatio)
         out.fx = f * sx / s
-        out.fy = f * sy / s
+        out.fy = f * sy / s * lateralGrip
         out.utilisation = s
         // Slope of Fx with respect to kappa, used for the implicit wheel-spin update.
         val eps = 1e-3

@@ -68,6 +68,23 @@ class Ground(
         return best
     }
 
+    /**
+     * Nearest road to (e, n) within [maxDist]: writes (clearance from the road edge, road heading)
+     * into [out] and returns true, or false if there is none.
+     */
+    fun nearestRoad(e: Double, n: Double, maxDist: Double, out: DoubleArray): Boolean {
+        val hits = hitsTL.get()
+        val cnt = roadIndex.nearestPerLine(e, n, maxOf(maxDist, maxInfluence), hits)
+        var best = -1; var bestD = Double.MAX_VALUE
+        for (k in 0 until cnt) {
+            val d = hits[k].dist - roads[hits[k].line].halfWidth
+            if (hits[k].dist <= maxDist && d < bestD) { bestD = d; best = k }
+        }
+        if (best < 0) return false
+        out[0] = bestD; out[1] = hits[best].heading
+        return true
+    }
+
     fun streamClearance(e: Double, n: Double): Double {
         val hits = hitsTL.get()
         val cnt = streamIndex.nearestPerLine(e, n, 30.0, hits)
@@ -267,8 +284,9 @@ object RoadFeatures {
             val k = floor(s / 3.2).toInt()
             val u = s - (k + 0.2 * Noise.rand(k, 1, seed + 9)) * 3.2 - lat * 0.25
             val len = 1.2 + 1.6 * Noise.rand(k, 2, seed + 9)
-            val hgt = 0.06 + 0.16 * Noise.rand(k, 3, seed + 9) * rough
-            out.height += hgt * Noise.smoothstep(0.0, 0.1, u) * (1 - Noise.smoothstep(len - 0.25, len, u))
+            val hgt = 0.04 + 0.11 * Noise.rand(k, 3, seed + 9) * rough
+            // Slabs with weathered, ramped edges rather than square steps.
+            out.height += hgt * Noise.smoothstep(0.0, 0.35, u) * (1 - Noise.smoothstep(len - 0.35, len, u))
         }
 
         // Embedded rocks ("baby heads").
@@ -295,10 +313,11 @@ object RoadFeatures {
         val curvature = r.heightAt(s + 10) + r.heightAt(s - 10) - 2 * r.heightAt(s)
         val wetSpot = Noise.value1(s / 32, seed + 10) * (0.4 + rough * 0.6) +
             0.5 * Noise.smoothstep(0.05, 0.4, curvature) + 0.15 * (1 - Noise.smoothstep(0.02, 0.06, ag)) - 0.78
-        if (wetSpot > 0) {
-            val m = minOf(1.0, wetSpot / 0.2)
+        // Water drains off steep pitches, so mud only collects on gentle grades.
+        if (wetSpot > 0 && ag < 0.10) {
+            val m = minOf(1.0, wetSpot / 0.2) * (1 - Noise.smoothstep(0.06, 0.10, ag))
             val lt = (lat / (half + 0.3)).coerceIn(-1.0, 1.0)
-            val depth = 0.22 * m * (1 - lt * lt)
+            val depth = 0.14 * m * (1 - lt * lt)
             out.height -= depth
             out.surface = Surface.MUD
             if (m > 0.6 && abs(lat) < half * 0.75) { out.puddle = true; out.waterDepth = depth * 0.6 }

@@ -61,13 +61,15 @@ New Hampshire's unmaintained Class VI roads.
 The **Difficulty** setting (menu) defaults to *Easy*:
 
 - **Easy** adds a stabiliser that holds the lean you ask for and shrugs off knocks from rocks and
-  ruts, keeps the chassis level over obstacles, gives 40% more tyre grip and a riding buddy who
-  pushes you out when you're stuck in a mud hole.
-- **Normal** gives a lighter stabiliser and 20% more grip.
+  ruts, keeps the bike tracking where it's pointed over bumps, keeps the chassis level over
+  obstacles, gives 40% more tyre grip (80% more sideways) and a riding buddy who pushes you out
+  when you're stuck.
+- **Normal** gives a lighter stabiliser and 20-35% more grip, and still has the buddy push.
 - **Realistic** is pure physics.
 
-The suspension is set up plush for trail riding (about 40% sag, soft digressive damping, aired-down
-tyres).
+The suspension is set up plush for trail riding: 270/260 mm of travel (rally-style), about 35%
+sag, soft high-speed damping that soaks up sharp hits, a progressive bottoming cushion, and
+aired-down tyres.
 
 ## Controls
 

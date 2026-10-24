@@ -73,7 +73,7 @@ class MotorcycleTest {
 
     private fun brakingDistance(surface: Surface, kind: RoadKind, abs: Boolean): Double {
         val b = bikeOn(surface, kind)
-        val assists = Assists(absFront = abs, absRear = abs, stability = 0.0, grip = 1.0)
+        val assists = Assists(absFront = abs, absRear = abs, stability = 0.0, grip = 1.0, lateralGrip = 1.0)
         val r = TestRider(b, assists)
         val v0 = if (surface.isPaved) 100 / 3.6 else 60 / 3.6
         r.run(14.0) { r.holdSpeed(v0, it) }
@@ -160,5 +160,33 @@ class MotorcycleTest {
         println("easy class VI weave: dist=%.0f crash=%s".format(hypot(b.x, b.y), b.crash))
         assertNull(b.crash)
         assertTrue(hypot(b.x, b.y) > 60)
+    }
+}
+
+class BumpStabilityTest {
+    /** Straight-ahead input on rough Class VI: how much do bumps knock the bike off line? */
+    @Test fun bumpsDontKnockTheBikeOffLine() {
+        for ((speed, rough) in listOf(7.0 to 0.75, 11.0 to 0.75, 11.0 to 0.95)) ride(speed, rough)
+    }
+
+    private fun ride(speed: Double, rough: Double) {
+        val ground = TestWorlds.pad(Surface.DIRT, RoadKind.CLASS_VI, rough, TestWorlds.Slope(0.03))
+        val b = Motorcycle(BikeSpec(), ground)
+        b.reset(0.0, 0.0, 0.0)
+        val easy = Assists().apply { applyDifficulty(Difficulty.EASY) }
+        val r = TestRider(b, easy)
+        r.run(4.0) { r.holdSpeed(speed, it) }
+        var sumYawRate = 0.0; var n = 0; var maxHdg = 0.0; var maxSlip = 0.0
+        r.run(20.0) {
+            r.holdSpeed(speed, it); it.steer = 0.0
+            sumYawRate += b.yawRate * b.yawRate; n++
+            maxHdg = maxOf(maxHdg, abs(b.yaw)); maxSlip = maxOf(maxSlip, abs(b.tanAlphaR))
+        }
+        val rmsYaw = kotlin.math.sqrt(sumYawRate / n)
+        println("bumps v=$speed rough=$rough: rms yaw rate=%.3f rad/s, max heading change=%.1f deg, max rear slip=%.3f, y drift=%.1f m, crash=%s".format(
+            rmsYaw, Math.toDegrees(maxHdg), maxSlip, b.y, b.crash))
+        assertNull(b.crash)
+        assertTrue(rmsYaw < 0.12, "bike tracks straight over bumps (rms yaw rate $rmsYaw)")
+        assertTrue(Math.toDegrees(maxHdg) < 15, "heading stays within 15 deg")
     }
 }

@@ -26,11 +26,11 @@ class BikeSpec(
     /** Wheel, tyre, brake disc and fork lowers / swingarm share (moves with the wheel). */
     val unsprungFront: Double = 17.0,
     val unsprungRear: Double = 22.0,
-    val frontTyreStiffness: Double = 110_000.0,
-    val rearTyreStiffness: Double = 125_000.0,
+    val frontTyreStiffness: Double = 95_000.0,
+    val rearTyreStiffness: Double = 110_000.0,
 
-    val frontTravel: Double = 0.24,
-    val rearTravel: Double = 0.23,
+    val frontTravel: Double = 0.27,
+    val rearTravel: Double = 0.26,
     val frontSpring: Double = 15_500.0,
     val rearSpring: Double = 16_500.0,
     val frontCompDamp: Double = 850.0,

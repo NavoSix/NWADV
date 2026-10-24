@@ -1,8 +1,8 @@
 import sys, math
-from route import plan, gpx_tracks, dist
+from route import plan, plan_grade, gpx_tracks, dist
 out=sys.argv[1]
 wp=[(43.8720,-71.5850),(43.8600,-71.5520),(43.8400,-71.5200)]
-p=plan(wp,14,0.16,pad=0.01)
+p=plan_grade(wp,14,0.10,0.22)
 L=sum(dist(a,b) for a,b in zip(p,p[1:]))
 grades=[]
 for i in range(0,len(p)-6,3):

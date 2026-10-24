@@ -40,12 +40,14 @@ class Assists(
     var stability: Double = 1.0,
     /** Multiplier on tyre grip (1 = realistic dual-sport tyres). */
     var grip: Double = 1.4,
+    /** Extra multiplier on sideways grip only (stops bumps from skating the bike sideways). */
+    var lateralGrip: Double = 1.3,
 ) {
-    fun applyDifficulty(d: Difficulty) { stability = d.stability; grip = d.grip }
+    fun applyDifficulty(d: Difficulty) { stability = d.stability; grip = d.grip; lateralGrip = d.lateralGrip }
 }
 
-enum class Difficulty(val label: String, val stability: Double, val grip: Double) {
-    EASY("Easy", 1.0, 1.4),
-    NORMAL("Normal", 0.6, 1.2),
-    REALISTIC("Realistic", 0.0, 1.0),
+enum class Difficulty(val label: String, val stability: Double, val grip: Double, val lateralGrip: Double) {
+    EASY("Easy", 1.0, 1.4, 1.3),
+    NORMAL("Normal", 0.6, 1.2, 1.15),
+    REALISTIC("Realistic", 0.0, 1.0, 1.0),
 }

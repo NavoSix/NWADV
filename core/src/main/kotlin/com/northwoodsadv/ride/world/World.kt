@@ -14,6 +14,8 @@ import com.northwoodsadv.ride.osm.RoadSpec
 import com.northwoodsadv.ride.terrain.DemElevation
 import com.northwoodsadv.ride.terrain.DemLoader
 import com.northwoodsadv.ride.terrain.Elevation
+import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 
 /** Everything needed to ride one GPX route. */
@@ -90,18 +92,9 @@ class WorldBuilder(private val cache: DiskCache) {
                 for (piece in Road.splitLong(line.xs, line.ys)) roads += Road(trailId--, spec, piece, elevation)
                 continue
             }
-            var runStart = -1
-            for (i in 0..line.size) {
-                val off = i < line.size && probe.roadClearance(line.xs[i], line.ys[i]) > 25.0
-                if (off && runStart < 0) runStart = i
-                if (!off && runStart >= 0) {
-                    val a = (runStart - 2).coerceAtLeast(0); val b = (i + 2).coerceAtMost(line.size)
-                    if ((b - a) * 10.0 >= 80.0) {
-                        for (piece in Road.splitLong(line.xs.copyOfRange(a, b), line.ys.copyOfRange(a, b)))
-                            roads += Road(trailId--, spec, piece, elevation)
-                    }
-                    runStart = -1
-                }
+            for (run in offRoadRuns(line, probe)) {
+                for (piece in Road.splitLong(line.xs.copyOfRange(run.first, run.last + 1), line.ys.copyOfRange(run.first, run.last + 1)))
+                    roads += Road(trailId--, spec, piece, elevation)
             }
         }
         if (roads.size > osmRoadCount && osmRoadCount > 0) {
@@ -149,6 +142,48 @@ class WorldBuilder(private val cache: DiskCache) {
     }
 
     companion object {
+        /**
+         * Index ranges of a GPX line (resampled every 10 m) that are NOT riding along a mapped
+         * road. Being near a road isn't enough: the track has to run alongside it (within ~10 m
+         * and heading the same way) for at least 80 m. So crossing a road, or passing close to
+         * one, keeps the trail continuous. Ranges overlap 30 m into the roads they join.
+         */
+        fun offRoadRuns(line: Polyline, ground: Ground): List<IntRange> {
+            val n = line.size
+            if (n < 2) return emptyList()
+            val follows = BooleanArray(n)
+            val hit = DoubleArray(2)
+            for (i in 0 until n) {
+                val a = maxOf(0, i - 1); val b = minOf(n - 1, i + 1)
+                val hdg = atan2(line.ys[b] - line.ys[a], line.xs[b] - line.xs[a])
+                if (ground.nearestRoad(line.xs[i], line.ys[i], 25.0, hit) && hit[0] < 10.0) {
+                    var d = abs(hdg - hit[1]) % PI
+                    if (d > PI / 2) d = PI - d
+                    follows[i] = d < Math.toRadians(30.0)
+                }
+            }
+            // Short "following" stretches are just crossings or brushes past a road.
+            var i = 0
+            while (i < n) {
+                if (!follows[i]) { i++; continue }
+                var j = i
+                while (j < n && follows[j]) j++
+                if (j - i < 8) for (k in i until j) follows[k] = false
+                i = j
+            }
+            val out = ArrayList<IntRange>()
+            i = 0
+            while (i < n) {
+                if (follows[i]) { i++; continue }
+                var j = i
+                while (j < n && !follows[j]) j++
+                val a = maxOf(0, i - 3); val b = minOf(n - 1, j - 1 + 3)
+                if (b > a) out += a..b
+                i = j
+            }
+            return out
+        }
+
         /** A world without any downloads, for tests and the offline demo. */
         fun offline(gpx: GpxFile, elevation: (LocalProjection) -> Elevation): World {
             val points = gpx.ridePoints

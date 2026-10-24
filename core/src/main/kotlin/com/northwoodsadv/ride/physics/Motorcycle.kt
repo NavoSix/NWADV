@@ -178,6 +178,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     private fun step(dt: Double, input: RiderInput, a: Assists) {
         val m = spec.mass
         stabilityNow = a.stability
+        casedRate = 7.5 + 7.5 * a.stability
         standing = input.standing
         val h = cgHeight
         val cy = cos(yaw); val sy = sin(yaw)
@@ -267,7 +268,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         patchLoadF += (fzF - patchLoadF) * kzF; patchLoadR += (fzR - patchLoadR) * kzR
         if (fzF <= 0) patchLoadF = 0.0
         if (fzR <= 0) patchLoadR = 0.0
-        Tire.forces(patchLoadF, kF, tanAlphaF, lean, spec.camberStiffness, sampleF.surface, a.grip, nominalF, tire)
+        Tire.forces(patchLoadF, kF, tanAlphaF, lean, spec.camberStiffness, sampleF.surface, a.grip, nominalF, tire, a.lateralGrip)
         val fxTireF = tire.fx; val fyTireF = tire.fy
         slipF = tire.utilisation
         omegaF = wheelSpin(omegaF, 0.0, brakeF, fxTireF, tire.dFxdKappa, spec.frontRadius, spec.frontWheelInertia, denomF, dt)
@@ -300,7 +301,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         } else tcClutchCap = Double.MAX_VALUE
         var wLimit = 1.0
         if (a.wheelieControl) {
-            val lift = (pitch - terrainPitch(gF, gR) - 0.06) / 0.08
+            val lift = (pitch - terrainPitch(gF, gR) - 0.10) / 0.08
             val unload = 1 - fzF / (0.5 * nominalF)
             if (lift > 0 && unload > 0) wLimit = 1 - (lift * unload).coerceIn(0.0, 1.0)
         }
@@ -324,7 +325,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
             brakeR *= absR
             if (absR < 0.97) absActive = true
         } else absR = 1.0
-        Tire.forces(patchLoadR, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR * a.grip, nominalR, tire)
+        Tire.forces(patchLoadR, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR * a.grip, nominalR, tire, a.lateralGrip)
         val fxTireR = tire.fx; val fyTireR = tire.fy
         slipR = tire.utilisation
 
@@ -409,11 +410,21 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val lowW = if (a.lowSpeedBalance) 1 - Noise.smoothstep(1.2, 3.5 + 1.5 * a.stability, abs(u)) else 0.0
 
         // Buddy push (easy mode): stuck with the throttle open, a riding buddy shoves you free.
-        if (a.stability >= 0.9 && throttleSmoothed > 0.4 && abs(u) < 0.5) stuckTime += dt else if (abs(u) > 1.5 || throttleSmoothed < 0.2) stuckTime = 0.0
-        buddyPush = stuckTime > 2.0
-        if (buddyPush) { fx += 0.3 * m * G * cy; fy += 0.3 * m * G * sy }
+        if (a.stability >= 0.5 && throttleSmoothed > 0.25 && abs(u) < 0.6) stuckTime += dt else if (abs(u) > 1.8 || throttleSmoothed < 0.15) stuckTime = 0.0
+        buddyPush = stuckTime > 1.2
+        if (buddyPush) { fx += 0.4 * m * G * cy; fy += 0.4 * m * G * sy }
 
         // ---- integrate planar motion ---------------------------------------------------
+        // Yaw stability assist: keep the bike turning at the rate its steering asks for, so a
+        // rock under one wheel doesn't slew it off line.
+        if (a.stability > 0 && abs(u) > 1.5) {
+            val rKin = u * tan(steer) / spec.wheelbase
+            mz -= (2200.0 * a.stability * (yawRate - rKin)).coerceIn(-2500.0, 2500.0)
+            // ...and damp sideways skating of the whole bike.
+            val vl = -vx * sy + vy * cy
+            val damp = 0.35 * a.stability * m * vl
+            fx -= damp * -sy; fy -= damp * cy
+        }
         vx += fx / m * dt; vy += fy / m * dt
         yawRate += mz / spec.yawInertia * dt
         // Feet down: kill sideways creep and spinning in place.
@@ -503,7 +514,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val hr = ground.height(px + dy * el, py - dx * el)
         val dLong = (hf - hb) / (2 * e)
         // ...and the carcass flexes sideways, absorbing part of a glancing hit.
-        val dLat = ((hl - hr) / (2 * el)).coerceIn(-1.0, 1.0) * 0.6 * (1 - 0.6 * stabilityNow)
+        val dLat = ((hl - hr) / (2 * el)).coerceIn(-1.0, 1.0) * 0.6 * (1 - 0.8 * stabilityNow)
         // Convert along/lateral gradient into world x/y gradient.
         grad[0] = dLong * dx - dLat * dy
         grad[1] = dLong * dy + dLat * dx
@@ -524,10 +535,10 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         // Topped out: the fork / shock stops the wheel hanging lower than full extension.
         if (comp <= 0) return 250_000.0 * comp + 1_500.0 * rate
         var f = k * comp + damper(rate, if (rate > 0) cComp else cReb)
-        if (comp > travel) {
-            val over = comp - travel
-            f += 350_000.0 * over + 4_000.0 * max(rate, 0.0)
-        }
+        // Hydraulic bottoming cushion over the last 30 mm, then the stop.
+        val cushion = comp - (travel - 0.03)
+        if (cushion > 0) f += 60_000.0 * cushion + 2_000_000.0 * cushion * cushion + 1_500.0 * max(rate, 0.0) * (cushion / 0.03).coerceAtMost(1.0)
+        if (comp > travel) f += 600_000.0 * (comp - travel) + 6_000.0 * max(rate, 0.0)
         return f
     }
 
@@ -537,8 +548,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
      */
     private fun damper(v: Double, c: Double): Double {
         val av = abs(v)
-        val knee = 0.2
-        val f = if (av < knee) c * av else c * knee + c * 0.22 * (av - knee)
+        val knee = 0.15
+        val f = if (av < knee) c * av else c * knee + c * 0.15 * (av - knee)
         return f * sign(v)
     }
 
@@ -663,13 +674,16 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
 
     private fun terrainPitch(gF: Double, gR: Double) = atan((gF - gR) / spec.wheelbase)
 
+    /** Bottoming speed (m/s) that counts as casing it; easy mode forgives a lot more. */
+    private var casedRate = 7.5
+
     private fun checkCrash(gF: Double, gR: Double, rateF: Double, rateR: Double, u: Double) {
         val relPitch = pitch - terrainPitch(gF, gR)
         crash = when {
             abs(lean) > 1.08 -> if (abs(u) < 2.5) CrashReason.TIPOVER else CrashReason.LOWSIDE
             relPitch > 1.05 -> CrashReason.LOOPED
             relPitch < -0.75 -> CrashReason.ENDO
-            (compF > spec.frontTravel + 0.06 && rateF > 7.5) || (compR > spec.rearTravel + 0.06 && rateR > 7.5) -> CrashReason.CASED
+            (compF > spec.frontTravel + 0.06 && rateF > casedRate) || (compR > spec.rearTravel + 0.06 && rateR > casedRate) -> CrashReason.CASED
             waterDepth > 0.8 || (sampleF.surface == Surface.DEEP_WATER && sampleR.surface == Surface.DEEP_WATER) -> CrashReason.DROWNED
             else -> null
         }

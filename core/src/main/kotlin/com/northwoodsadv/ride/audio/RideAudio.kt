@@ -38,20 +38,43 @@ class RideAudio : Disposable {
 
     private fun loop() {
         val buf = FloatArray(512)
-        val rnd = Random(7)
-        var crank = 0.0
-        var pulse = 0.0
-        var lpA = 0.0; var bp1 = 0.0; var bp2 = 0.0
-        var windLp = 0.0; var scrubLp = 0.0
-        var lastAngle = 0.0
+        val synth = RideSynth(rate)
         val dev = device ?: return
         while (running) {
-            val r = rpm.toDouble().coerceIn(600.0, 11000.0)
-            val thr = throttle.toDouble()
-            val v = speed.toDouble()
-            val sl = slip.toDouble()
-            val lo = loose.toDouble()
-            val vol = if (muted) 0.0 else volume.toDouble()
+            synth.rpm = rpm.toDouble(); synth.throttle = throttle.toDouble(); synth.speed = speed.toDouble()
+            synth.slip = slip.toDouble(); synth.loose = loose.toDouble(); synth.volume = if (muted) 0.0 else volume.toDouble()
+            synth.fill(buf)
+            try { dev.writeSamples(buf, 0, buf.size) } catch (e: Throwable) { break }
+        }
+    }
+
+    override fun dispose() {
+        running = false
+        thread?.join(200)
+        try { device?.dispose() } catch (_: Throwable) {}
+    }
+
+}
+
+/** The sound generator itself (no audio device), so it can be tested offline. */
+class RideSynth(private val rate: Int) {
+    var rpm = 1300.0; var throttle = 0.0; var speed = 0.0; var slip = 0.0; var loose = 0.0; var volume = 0.8
+    private val rnd = Random(7)
+    private var crank = 0.0
+    private var pulse = 0.0
+    private var lpA = 0.0; private var bp1 = 0.0; private var bp2 = 0.0
+    private var windLp = 0.0; private var scrubLp = 0.0
+    private var lastAngle = 0.0
+    private var lastExcite = 0.0
+    private var dcIn = 0.0; private var dcOut = 0.0
+
+    fun fill(buf: FloatArray) {
+            val r = rpm.coerceIn(600.0, 11000.0)
+            val thr = throttle
+            val v = speed
+            val sl = slip
+            val lo = loose
+            val vol = volume
             // Muffler resonance tracks rpm a little (bigger boom at low revs).
             val f0 = 90.0 + r / 60.0 * 0.9
             val w0 = 2 * PI * f0 / rate
@@ -67,11 +90,14 @@ class RideAudio : Disposable {
                 lastAngle = a
                 pulse *= decay
                 val excite = pulse * (0.7 + 0.3 * rnd.nextDouble())
-                // Resonant body.
-                val y = excite + c1 * bp1 + c2 * bp2
+                // Resonant body, driven by the pressure *change* so it has no DC build-up.
+                val y = (excite - lastExcite) + c1 * bp1 + c2 * bp2
+                lastExcite = excite
                 bp2 = bp1; bp1 = y
                 lpA += (y - lpA) * 0.35
-                var s = lpA * 0.05 * (0.55 + 0.45 * thr)
+                // DC blocker, then level.
+                dcOut = lpA - dcIn + 0.995 * dcOut; dcIn = lpA
+                var s = dcOut * 0.09 * (0.9 + 0.5 * thr)
                 // Overrun crackle.
                 if (thr < 0.05 && r > 3500 && rnd.nextDouble() < 0.0008) s += (rnd.nextDouble() - 0.5) * 0.6
                 // Wind.
@@ -82,16 +108,8 @@ class RideAudio : Disposable {
                 scrubLp += (n - scrubLp) * 0.25
                 s += scrubLp * (sl - 0.9).coerceIn(0.0, 1.5) * min(1.0, v / 4) * 0.25
                 if (lo > 0 && rnd.nextDouble() < min(v, 25.0) * 0.003 * lo) s += (rnd.nextDouble() - 0.5) * 0.25
-                buf[i] = (s * vol).coerceIn(-1.0, 1.0).toFloat()
+                // Soft limiter rather than hard clipping.
+                buf[i] = kotlin.math.tanh(s * vol).toFloat()
             }
-            try { dev.writeSamples(buf, 0, buf.size) } catch (e: Throwable) { break }
-        }
     }
-
-    override fun dispose() {
-        running = false
-        thread?.join(200)
-        try { device?.dispose() } catch (_: Throwable) {}
-    }
-
 }

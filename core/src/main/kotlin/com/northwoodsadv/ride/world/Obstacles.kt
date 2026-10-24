@@ -30,7 +30,7 @@ object Obstacles {
         t.y = (j + 0.1 + 0.8 * Noise.rand(i, j, TREE_SEED + 2)) * TREE_CELL
         val h = ground.elevation.height(t.x, t.y)
         if (p >= density(ground, ground.landcover.at(t.x, t.y), h)) return false
-        if (ground.roadClearance(t.x, t.y) < 2.2) return false
+        if (ground.roadClearance(t.x, t.y) < 3.0) return false
         if (ground.streamClearance(t.x, t.y) < 1.0) return false
         val q = Noise.rand(i, j, TREE_SEED + 3)
         t.height = 9 + 15 * q * if (h > Ground.TREELINE - 150) 0.35 else 1.0

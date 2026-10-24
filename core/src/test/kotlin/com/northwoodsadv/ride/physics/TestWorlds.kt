@@ -10,7 +10,7 @@ import com.northwoodsadv.ride.world.Road
 import com.northwoodsadv.ride.world.Surface
 
 /** Pure physics, no stabiliser or grip boost: what the realism tests measure. */
-fun realistic() = Assists(stability = 0.0, grip = 1.0)
+fun realistic() = Assists(stability = 0.0, grip = 1.0, lateralGrip = 1.0)
 
 object TestWorlds {
     /** A huge flat pad of one surface centred on the origin (a 400 m wide "road" along x). */

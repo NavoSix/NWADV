@@ -39,3 +39,49 @@ def gpx_tracks(name, desc, tracks):
         out.append('  </trkseg></trk>')
     out.append('</gpx>')
     return "\n".join(out)+"\n"
+
+def plan_grade(waypoints, z, grade_ok, grade_max, pad=0.015):
+    """Least-cost path where cost depends on the grade *along* each step, so the line
+    switchbacks across slopes the way real roads do instead of charging straight up them."""
+    import heapq
+    lats=[p[0] for p in waypoints]; lons=[p[1] for p in waypoints]
+    m, ox, oy = mosaic(min(lats)-pad, min(lons)-pad, max(lats)+pad, max(lons)+pad, z)
+    lat_c=sum(lats)/len(lats)
+    mpp = 2*math.pi*6378137*math.cos(math.radians(lat_c))/(256*2**z)
+    H, W = m.shape
+    nbrs=[(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1),(-2,-1),(-2,1),(-1,-2),(-1,2),(1,-2),(1,2),(2,-1),(2,1)]
+    steps=[(dr,dc,math.hypot(dr,dc)*mpp) for dr,dc in nbrs]
+    hl=m.tolist()
+    path=[]
+    for a,b in zip(waypoints, waypoints[1:]):
+        xa,ya=px(*a,z); xb,yb=px(*b,z)
+        s=(int(ya-oy),int(xa-ox)); t=(int(yb-oy),int(xb-ox))
+        dist={s:0.0}; prev={}; pq=[(0.0,s)]
+        while pq:
+            d,u=heapq.heappop(pq)
+            if u==t: break
+            if d>dist.get(u,1e18): continue
+            r,c=u; h0=hl[r][c]
+            for dr,dc,L in steps:
+                rr,cc=r+dr,c+dc
+                if rr<0 or cc<0 or rr>=H or cc>=W: continue
+                g=abs(hl[rr][cc]-h0)/L
+                if g>grade_max: continue
+                nd=d+L*(1+(g/grade_ok)**4)
+                v=(rr,cc)
+                if nd<dist.get(v,1e18):
+                    dist[v]=nd; prev[v]=u; heapq.heappush(pq,(nd,v))
+        seg=[t]
+        while seg[-1]!=s: seg.append(prev[seg[-1]])
+        seg.reverse()
+        path += seg if not path else seg[1:]
+    pts=[]
+    for (r,c) in path:
+        lat,lon=latlon(c+ox+0.5, r+oy+0.5, z)
+        pts.append((lat,lon,float(m[r,c])))
+    k=3
+    sm=[]
+    for i in range(len(pts)):
+        a=max(0,i-k); b=min(len(pts),i+k+1)
+        sm.append((sum(p[0] for p in pts[a:b])/(b-a), sum(p[1] for p in pts[a:b])/(b-a), pts[i][2]))
+    return sm[::2]

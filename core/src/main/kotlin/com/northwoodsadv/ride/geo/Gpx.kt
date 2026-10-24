@@ -3,7 +3,8 @@ package com.northwoodsadv.ride.geo
 import com.badlogic.gdx.utils.XmlReader
 
 /** A named list of points from a GPX track, route or the waypoints. */
-class GpxTrack(val name: String, val points: List<GeoPoint>)
+/** A named list of points from a GPX track or route. [type] is the GPX <type> (used as a surface hint). */
+class GpxTrack(val name: String, val points: List<GeoPoint>, val type: String? = null)
 
 class GpxWaypoint(val name: String, val point: GeoPoint)
 
@@ -43,13 +44,13 @@ object GpxParser {
                         if (local(seg.name) != "trkseg") continue
                         for (p in 0 until seg.childCount) point(seg.getChild(p), "trkpt")?.let(pts::add)
                     }
-                    if (pts.size >= 2) tracks += GpxTrack(name, dedupe(pts))
+                    if (pts.size >= 2) tracks += GpxTrack(name, dedupe(pts), childText(el, "type"))
                 }
                 "rte" -> {
                     val name = childText(el, "name") ?: "Route ${tracks.size + 1}"
                     val pts = ArrayList<GeoPoint>()
                     for (p in 0 until el.childCount) point(el.getChild(p), "rtept")?.let(pts::add)
-                    if (pts.size >= 2) tracks += GpxTrack(name, dedupe(pts))
+                    if (pts.size >= 2) tracks += GpxTrack(name, dedupe(pts), childText(el, "type"))
                 }
                 "wpt" -> point(el, "wpt")?.let { waypoints += GpxWaypoint(childText(el, "name") ?: "Waypoint", it) }
             }

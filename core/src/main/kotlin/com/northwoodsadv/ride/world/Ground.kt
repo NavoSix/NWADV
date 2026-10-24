@@ -200,7 +200,13 @@ object RoadFeatures {
         val seed = r.seed
         val half = r.halfWidth
         if (spec.isClassVI || rough >= 0.3) {
+            // Ends of a road (junctions, trailheads) are where it gets graded: fade features in.
+            val k = Noise.smoothstep(5.0, 40.0, s) * Noise.smoothstep(5.0, 40.0, r.line.length - s)
+            if (k <= 0) return
+            val h0 = out.height; val s0 = out.surface
             unmaintained(r, s, lat, out, rough, seed, half)
+            out.height = h0 + (out.height - h0) * k
+            if (k < 0.5) { out.surface = s0; out.puddle = false; out.waterDepth = 0.0 }
         } else if (spec.surface.isPaved) {
             // Frost heaves: a fact of life on New Hampshire back roads.
             if (rough >= 0.08) {

@@ -5,7 +5,7 @@ import java.io.File
 /** Platform specific services supplied by the Android / desktop launchers. */
 interface Platform {
     /** Directory for downloaded map data. Survives app restarts. */
-    val cacheDir: File
+    val mapCacheDir: File
 
     /** True on phones/tablets: shows on-screen controls and enables tilt steering. */
     val isTouchDevice: Boolean

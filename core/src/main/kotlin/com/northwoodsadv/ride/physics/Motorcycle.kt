@@ -67,13 +67,16 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     var wheelAngleF = 0.0; var wheelAngleR = 0.0
     var engineOmega = 0.0
     var gear = 1
-    private var clutchLocked = false
+    var clutchLocked = false; private set
     var tanAlphaF = 0.0; private set
     var tanAlphaR = 0.0; private set
     private var shiftCut = 0.0; private var shiftCooldown = 0.0
     private var throttleSmoothed = 0.0
     /** Electronic aids: fraction of throttle / front brake currently allowed (1 = no intervention). */
     var tcFactor = 1.0; private set
+    private var tcTrim = 1.0
+    private var tcClutchCap = Double.MAX_VALUE
+    private var wheelieFactor = 1.0
     private var absLiftFactor = 1.0
     private var absF = 1.0; private var absR = 1.0
     private var lastTerrainPitch = 0.0
@@ -272,32 +275,42 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         if (shiftCut > 0) thr = 0.0
         val denomR = max(abs(uR), 1.5)
         var kR = (omegaR * spec.rearRadius - uR) / denomR
-        // Traction / wheelie control: proportional cut with fast attack and slow release.
-        var allowed = 1.0
-        // Wheelspin relative to forward ground speed (rolling backwards isn't wheelspin).
-        val spin = (omegaR * spec.rearRadius - max(uR, 0.0)) / max(uR, 1.5)
-        if (a.tractionControl && uR > 0.3 && spin > 0.02) {
-            // Uses combined slip, so it also protects a leaned-over rear tyre.
+        // Traction control: feed-forward throttle limit from the traction the rear tyre can take
+        // (grip x load vs engine torque x gearing), trimmed by a slow loop on measured wheelspin.
+        // Wheelie control: back off as the front goes light and the nose comes up.
+        var limit = 1.0
+        val rpmPre = engineOmega * 60 / (2 * PI)
+        if (a.tractionControl && ratio > 0) {
+            val spin = if (omegaR > 0) (omegaR * spec.rearRadius - uR) / max(abs(uR), 1.5) else 0.0
             val sx = spin / sampleR.surface.slipPeak
-            val sy = tanAlphaR / tan(Math.toRadians(sampleR.surface.anglePeakDeg))
-            val excess = sqrt(sx * sx + sy * sy) / 1.1 - 1
-            if (excess > 0) allowed = min(allowed, 1 - 2.5 * excess)
-        }
+            // Lean-sensitive (combined) once moving; plain wheelspin at walking pace.
+            val sy = if (uR > 5.0) tanAlphaR / tan(Math.toRadians(sampleR.surface.anglePeakDeg)) else 0.0
+            val slip = if (spin > 0) sqrt(sx * sx + sy * sy) else 0.0
+            tcTrim = (tcTrim - dt * 6.0 * (slip - 0.95)).coerceIn(0.3, 2.5)
+            val grip = sampleR.surface.mu * max(patchLoadR, 200.0) * spec.rearRadius
+            val drive = max(spec.engineTorque(max(rpmPre, spec.idleRpm)), 1.0) * ratio * spec.drivelineEfficiency
+            limit = (grip / drive * tcTrim).coerceIn(0.0, 1.0)
+            tcClutchCap = grip * tcTrim / (ratio * spec.drivelineEfficiency)
+        } else tcClutchCap = Double.MAX_VALUE
+        var wLimit = 1.0
         if (a.wheelieControl) {
             val lift = (pitch - terrainPitch(gF, gR) - 0.06) / 0.08
             val unload = 1 - fzF / (0.5 * nominalF)
-            if (lift > 0 && unload > 0) allowed = min(allowed, 1 - lift * unload)
+            if (lift > 0 && unload > 0) wLimit = 1 - (lift * unload).coerceIn(0.0, 1.0)
         }
-        allowed = allowed.coerceIn(0.0, 1.0)
-        tcFactor = if (allowed < tcFactor) allowed else min(1.0, tcFactor + dt * 2.5)
-        tcActive = tcFactor < 0.97
-        // Locked clutch: cut engine torque. Slipping clutch: feather the clutch, keep the revs.
-        thr *= if (clutchLocked) tcFactor else max(tcFactor, 0.4)
+        limit = min(limit, wLimit)
+        wheelieFactor += (wLimit - wheelieFactor) * min(1.0, dt * 30)
+        tcFactor += (limit - tcFactor) * min(1.0, dt * 30)
+        tcActive = tcFactor < 0.97 && thr > tcFactor
+        // Locked clutch: trim the throttle. Slipping clutch: the revs stay up and the clutch
+        // torque is capped instead (what a rider feathering the clutch does).
+        if (clutchLocked) thr = min(thr, tcFactor)
         val rpmNow = engineOmega * 60 / (2 * PI)
         var engT = if (rpmNow >= spec.redlineRpm) -spec.engineDrag(rpmNow)
         else thr * spec.engineTorque(rpmNow) - (1 - thr) * spec.engineDrag(rpmNow)
-        // Idle governor.
-        if (rpmNow < spec.idleRpm) engT = max(engT, (spec.idleRpm - rpmNow) * 0.15)
+        // Idle governor (only with the clutch slipping / in neutral; lugging the engine below idle
+        // in gear makes the auto clutch let go instead).
+        if (rpmNow < spec.idleRpm && !clutchLocked) engT = max(engT, (spec.idleRpm - rpmNow) * 0.15)
 
         var brakeR = input.rearBrake.coerceIn(0.0, 1.0) * spec.rearBrakeMax
         if (a.absRear && brakeR > 0 && abs(uR) > 1.5) {
@@ -315,13 +328,13 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
             omegaR = wheelSpin(omegaR, engT * ratio * spec.drivelineEfficiency, brakeR, fxTireR, tire.dFxdKappa,
                 spec.rearRadius, inertia, denomR, dt)
             engineOmega = omegaR * ratio
-            if (engineOmega * 60 / (2 * PI) < spec.idleRpm * 0.85 && thr < 0.6) clutchLocked = false
+            if (engineOmega * 60 / (2 * PI) < spec.idleRpm * 0.97) clutchLocked = false
         } else {
             // Slipping clutch (centrifugal-style auto clutch engages with revs). Engine and wheel
             // are coupled through a 16:1 ratio, so the clutch is solved implicitly with the tyre.
             val engage = if (ratio == 0.0) 0.0 else Noise.smoothstep(spec.idleRpm * 1.1, 2900.0, rpmNow)
             val slip0 = engineOmega - omegaR * ratio
-            val cmax = 160.0 * engage * (if (a.tractionControl) tcFactor else 1.0)
+            val cmax = min(200.0 * engage, tcClutchCap) * wheelieFactor
             val th = tanh(slip0 / CLUTCH_SLIP)
             val tc0 = cmax * th
             val kc = cmax / CLUTCH_SLIP * (1 - th * th)
@@ -544,7 +557,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
 
     private fun handleShifting(input: RiderInput, a: Assists, dt: Double) {
         if (shiftCooldown > 0) return
-        val rpmNow = rpm
+        // Shift on road speed (like a real auto-shifter), not on revs from a spinning wheel.
+        val rpmNow = min(rpm, max(forwardSpeed, 0.0) / spec.rearRadius * spec.overallRatio(gear) * 60 / (2 * PI) * 1.05)
         var want = 0
         if (input.shiftUp) want = 1 else if (input.shiftDown) want = -1
         else if (a.autoShift) {
@@ -589,7 +603,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
                 leanErrInt = leanErrInt.coerceIn(-0.5, 0.5)
                 // A smooth rider doesn't ask more of the front tyre than the surface offers.
                 val corrMax = 0.45 * sampleF.surface.mu * G
-                G * tanL + (18.7 * err + k2 * leanRate + 8.0 * leanErrInt).coerceIn(-corrMax, corrMax)
+                G * tanL + (18.7 * err + 8.0 * leanErrInt).coerceIn(-corrMax, corrMax) +
+                    (k2 * leanRate).coerceIn(-1.6 * corrMax, 1.6 * corrMax)
             }
             SteerMode.COUNTERSTEER -> G * tanL + 0.8 * lean + k2 * 0.7 * leanRate + 12.0 * input.steer.coerceIn(-1.0, 1.0)
         }

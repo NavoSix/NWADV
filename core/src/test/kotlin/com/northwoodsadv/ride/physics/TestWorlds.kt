@@ -51,5 +51,6 @@ class TestRider(private val bike: Motorcycle, private val assists: Assists = Ass
         val err = target - bike.forwardSpeed
         i.throttle = (0.15 + err * 0.25).coerceIn(0.0, 1.0)
         i.frontBrake = if (err < -2) ((-err - 2) * 0.1).coerceIn(0.0, 0.5) else 0.0
+        i.rearBrake = 0.0
     }
 }

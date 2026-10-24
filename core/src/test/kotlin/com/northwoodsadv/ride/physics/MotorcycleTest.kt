@@ -116,6 +116,7 @@ class MotorcycleTest {
         val b = Motorcycle(spec, ground)
         b.reset(0.0, 0.0, 0.0)
         val r = TestRider(b)
+        r.run(1.0) { it.frontBrake = 1.0; it.rearBrake = 1.0; it.throttle = 0.3 }
         r.run(10.0) { r.holdSpeed(8.0, it) }
         println("25%% climb: speed=%.1f m/s gear=%d crash=%s".format(b.forwardSpeed, b.gear, b.crash))
         assertNull(b.crash)

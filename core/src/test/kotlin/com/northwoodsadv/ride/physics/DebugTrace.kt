@@ -4,8 +4,8 @@ import com.northwoodsadv.ride.world.Surface
 import org.junit.Test
 
 class DebugTrace {
-    private fun line(r: TestRider, b: Motorcycle) = "t=%.2f x=%.2f u=%.2f y=%.2f yaw=%.3f r=%.3f lean=%.3f lr=%.3f steer=%.3f pitch=%.3f fzF=%.0f fzR=%.0f cF=%.3f cR=%.3f kF=%.2f kR=%.2f sF=%.2f sR=%.2f g=%d rpm=%.0f tc=%.2f".format(
-        r.time, b.x, b.forwardSpeed, b.y, b.yaw, b.yawRate, b.lean, b.leanRate, b.steer, b.pitch, b.fzF, b.fzR, b.compF, b.compR, b.kappaF, b.kappaR, b.slipF, b.slipR, b.gear, b.rpm, b.tcFactor)
+    private fun line(r: TestRider, b: Motorcycle) = "t=%.2f x=%.2f u=%.2f y=%.2f yaw=%.3f r=%.3f lean=%.3f lr=%.3f steer=%.3f pitch=%.3f fzF=%.0f fzR=%.0f cF=%.3f cR=%.3f kF=%.2f kR=%.2f sF=%.2f sR=%.2f g=%d rpm=%.0f tc=%.2f lk=%s wR=%.2f".format(
+        r.time, b.x, b.forwardSpeed, b.y, b.yaw, b.yawRate, b.lean, b.leanRate, b.steer, b.pitch, b.fzF, b.fzR, b.compF, b.compR, b.kappaF, b.kappaR, b.slipF, b.slipR, b.gear, b.rpm, b.tcFactor, b.clutchLocked, b.omegaR * 0.345)
 
     private fun trace(name: String, phases: List<Pair<Double, (TestRider, Motorcycle, RiderInput) -> Unit>>, surface: Surface = Surface.ASPHALT,
                       ground: com.northwoodsadv.ride.world.Ground = TestWorlds.pad(surface)) {
@@ -26,7 +26,7 @@ class DebugTrace {
     @Test fun launch() = trace("launch", listOf(8.0 to { _, _, i -> i.throttle = 1.0 }))
     @Test fun brake() = trace("brake", listOf(12.0 to { r, _, i -> r.holdSpeed(27.0, i) }, 6.0 to { _, _, i -> i.throttle = 0.0; i.frontBrake = 1.0; i.rearBrake = 1.0 }))
     @Test fun gbrake() = trace("gbrake", listOf(14.0 to { r, _, i -> r.holdSpeed(16.7, i) }, 6.0 to { _, b, i -> i.throttle = 0.0; i.frontBrake = 1.0; i.rearBrake = 1.0; if (b.forwardSpeed < 0.3) { i.frontBrake = 0.0; i.rearBrake = 0.0 } }), Surface.GRAVEL_LOOSE)
-    @Test fun climb() = trace("climb", listOf(10.0 to { r, _, i -> r.holdSpeed(8.0, i) }), ground = TestWorlds.pad(Surface.DIRT, com.northwoodsadv.ride.osm.RoadKind.CLASS_VI, 0.0, TestWorlds.Slope(0.25)))
+    @Test fun climb() = trace("climb", listOf(1.0 to { _, _, i -> i.frontBrake = 1.0; i.rearBrake = 1.0; i.throttle = 0.3 }, 10.0 to { r, _, i -> r.holdSpeed(8.0, i) }), ground = TestWorlds.pad(Surface.DIRT, com.northwoodsadv.ride.osm.RoadKind.CLASS_VI, 0.0, TestWorlds.Slope(0.25)))
     @Test fun gturn() = trace("gturn", listOf(8.0 to { r, _, i -> r.holdSpeed(12.0, i) }, 6.0 to { r, _, i -> r.holdSpeed(12.0, i); i.steer = -20.0 / 52 }),
         ground = TestWorlds.pad(Surface.GRAVEL_PACKED, com.northwoodsadv.ride.osm.RoadKind.GRAVEL))
     @Test fun c6() = trace("c6", listOf(20.0 to { r, _, i -> r.holdSpeed(5.0, i); r.holdHeading(0.0, i); i.standing = true }),

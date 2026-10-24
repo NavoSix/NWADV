@@ -9,36 +9,39 @@ import com.northwoodsadv.ride.Settings
 import com.northwoodsadv.ride.physics.RiderInput
 import com.northwoodsadv.ride.ui.Ui
 import kotlin.math.abs
-import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.sign
 
 /**
- * Turns keyboard, touch and phone tilt into [RiderInput].
+ * Turns keyboard and touch into [RiderInput].
  *
- * Touch layout (landscape): front brake slider bottom-left with the rear brake beside it;
- * throttle slider bottom-right. Tilt the phone like a handlebar to lean, or use the on-screen
- * steering strip if tilt is off.
+ * Touch layout (landscape): a floating joystick on the left (left/right = lean, up/down = shift
+ * your weight forward/back); throttle slider at the right edge with the front brake slider and
+ * rear brake button beside it.
  */
-class RideControls(private val settings: Settings, private val touch: Boolean) {
+class RideControls(@Suppress("unused") private val settings: Settings, private val touch: Boolean) {
     val input = RiderInput()
-    private var tiltZero = Float.NaN
     private var keySteer = 0.0
     var standToggle = false
-    var lastTilt = 0f; private set
+    private var stickPointer = -1
+    private var stickX = 0f; private var stickY = 0f
+    private var knobX = 0f; private var knobY = 0f
 
-    fun recenterTilt() { tiltZero = Float.NaN }
-
-    /** Phone roll angle in degrees in the current landscape orientation. */
-    private fun tiltDegrees(): Float {
-        val ay = Gdx.input.accelerometerY; val ax = Gdx.input.accelerometerX; val az = Gdx.input.accelerometerZ
-        // Native portrait device held in landscape: roll is around the long axis.
-        val roll = when (Gdx.input.rotation) {
-            90 -> atan2(ay, az)
-            270 -> -atan2(ay, az)
-            180 -> -atan2(ax, az)
-            else -> atan2(ax, az)
-        }
-        return Math.toDegrees(roll.toDouble()).toFloat()
+    private class Layout(ui: Ui) {
+        val u = ui.u
+        val sw = u * 6.5f
+        val sh = ui.h * 0.40f
+        val throttleX = ui.w - sw - u * 1.5f
+        val brakeX = throttleX - sw - u * 1.2f
+        val y = u * 1.5f
+        val rearX = brakeX - sw - u * 1.2f
+        val rearY = y
+        val rearH = ui.h * 0.22f
+        val stickR = u * 7.5f
+        val stickZoneW = ui.w * 0.42f
+        val stickZoneH = ui.h * 0.72f
+        val stickHomeX = u * 12f
+        val stickHomeY = u * 12f
     }
 
     fun update(ui: Ui, dt: Float) {
@@ -57,27 +60,31 @@ class RideControls(private val settings: Settings, private val touch: Boolean) {
         i.shiftUp = Gdx.input.isKeyJustPressed(Input.Keys.E)
         i.shiftDown = Gdx.input.isKeyJustPressed(Input.Keys.Q)
         if (Gdx.input.isKeyJustPressed(Input.Keys.F)) standToggle = !standToggle
-        i.weightShift = (if (Gdx.input.isKeyPressed(Input.Keys.R)) 1.0 else 0.0) - (if (Gdx.input.isKeyPressed(Input.Keys.V)) 1.0 else 0.0)
+        var weight = (if (Gdx.input.isKeyPressed(Input.Keys.R)) 1.0 else 0.0) - (if (Gdx.input.isKeyPressed(Input.Keys.V)) 1.0 else 0.0)
 
         // --- touch ------------------------------------------------------------------------
         if (touch) {
-            val u = ui.u
-            val sw = u * 7f; val sh = ui.h * 0.52f
-            val t = ui.slider(ui.w - sw - u * 1.5f, u * 1.5f, sw, sh)
+            val l = Layout(ui)
+            val t = ui.slider(l.throttleX, l.y, l.sw, l.sh)
             if (t >= 0) throttle = t.toDouble()
-            val fb = ui.slider(u * 1.5f, u * 1.5f, sw, sh)
+            val fb = ui.slider(l.brakeX, l.y, l.sw, l.sh)
             if (fb >= 0) front = fb.toDouble()
-            if (ui.pointerIn(u * 2.5f + sw, u * 1.5f, u * 6f, u * 9f)) rear = 1.0
-            if (settings.tiltSteering) {
-                val tilt = tiltDegrees()
-                if (tiltZero.isNaN()) tiltZero = tilt
-                var d = tilt - tiltZero
-                lastTilt = d
-                d = if (abs(d) < 1.5f) 0f else d - sign(d) * 1.5f
-                steer = (d / settings.tiltRange).toDouble().coerceIn(-1.0, 1.0)
+            if (ui.pointerIn(l.rearX, l.rearY, l.sw, l.rearH)) rear = 1.0
+
+            // Floating joystick: centred wherever your thumb lands in the left zone.
+            val p = ui.pointerStartedIn(0f, 0f, l.stickZoneW, l.stickZoneH)
+            if (p >= 0) {
+                if (p != stickPointer) { stickPointer = p; val d = ui.downPos(p); stickX = d[0]; stickY = d[1] }
+                val pos = ui.pointerPos(p)
+                var dx = pos[0] - stickX; var dy = pos[1] - stickY
+                val len = hypot(dx, dy)
+                if (len > l.stickR) { dx *= l.stickR / len; dy *= l.stickR / len }
+                knobX = stickX + dx; knobY = stickY + dy
+                steer = shape(dx / l.stickR)
+                weight = (dy / l.stickR).toDouble().let { if (abs(it) < 0.35) 0.0 else (it - sign(it) * 0.35) / 0.65 }
             } else {
-                val hs = ui.hslider(ui.w * 0.3f, u * 10f, ui.w * 0.4f, u * 8f)
-                if (!hs.isNaN()) steer = hs.toDouble()
+                stickPointer = -1
+                stickX = l.stickHomeX; stickY = l.stickHomeY; knobX = stickX; knobY = stickY
             }
         }
         i.steer = steer
@@ -85,26 +92,40 @@ class RideControls(private val settings: Settings, private val touch: Boolean) {
         i.frontBrake = front
         i.rearBrake = rear
         i.standing = standToggle
+        i.weightShift = weight
     }
 
-    /** Draws the touch controls. Returns nothing; buttons are handled by the ride screen. */
+    /** Dead zone and a soft centre so small corrections are easy. */
+    private fun shape(x: Float): Double {
+        val a = abs(x)
+        if (a < 0.06f) return 0.0
+        val v = (a - 0.06f) / 0.94f
+        return (sign(x) * (0.45f * v + 0.55f * v * v)).toDouble()
+    }
+
     fun draw(ui: Ui) {
         if (!touch) return
-        val u = ui.u
-        val sw = u * 7f; val sh = ui.h * 0.52f
-        slider(ui, ui.w - sw - u * 1.5f, u * 1.5f, sw, sh, input.throttle.toFloat(), "THROTTLE", Color(0.3f, 0.75f, 0.35f, 0.75f))
-        slider(ui, u * 1.5f, u * 1.5f, sw, sh, input.frontBrake.toFloat(), "FRONT\nBRAKE", Color(0.85f, 0.3f, 0.25f, 0.75f))
-        val rx = u * 2.5f + sw; val rw = u * 6f; val rh = u * 9f
-        ui.rect(rx, u * 1.5f, rw, rh, if (input.rearBrake > 0) Color(0.85f, 0.3f, 0.25f, 0.8f) else Ui.BUTTON)
-        ui.text("REAR", rx, u * 1.5f + rh / 2 + u * 0.5f, Color.WHITE, Align.center, ui.font, rw)
-        if (!settings.tiltSteering) {
-            ui.rect(ui.w * 0.3f, u * 10f, ui.w * 0.4f, u * 8f, Color(1f, 1f, 1f, 0.08f))
-            ui.text("drag to steer", ui.w * 0.3f, u * 14.5f, Color(1f, 1f, 1f, 0.5f), Align.center, ui.font, ui.w * 0.4f)
-        }
+        val l = Layout(ui)
+        slider(ui, l.throttleX, l.y, l.sw, l.sh, input.throttle.toFloat(), "GAS", Color(0.3f, 0.75f, 0.35f, 0.75f))
+        slider(ui, l.brakeX, l.y, l.sw, l.sh, input.frontBrake.toFloat(), "FRONT\nBRAKE", Color(0.85f, 0.3f, 0.25f, 0.75f))
+        ui.rect(l.rearX, l.rearY, l.sw, l.rearH, if (input.rearBrake > 0) Color(0.85f, 0.3f, 0.25f, 0.8f) else Ui.BUTTON)
+        ui.text("REAR", l.rearX, l.rearY + l.rearH / 2 + ui.u * 0.5f, Color.WHITE, Align.center, ui.font, l.sw)
+
+        // Joystick.
+        val active = stickPointer >= 0
+        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        ui.shapes.begin(ShapeRenderer.ShapeType.Filled)
+        ui.shapes.color = Color(1f, 1f, 1f, if (active) 0.12f else 0.07f)
+        ui.shapes.circle(stickX, stickY, l.stickR, 40)
+        ui.shapes.color = Color(1f, 1f, 1f, if (active) 0.45f else 0.25f)
+        ui.shapes.circle(knobX, knobY, l.stickR * 0.42f, 30)
+        ui.shapes.end()
+        if (!active) ui.text("LEAN", stickX - l.stickR, stickY + ui.u * 0.6f, Color(1f, 1f, 1f, 0.5f), Align.center, ui.font, l.stickR * 2)
     }
 
     private fun slider(ui: Ui, x: Float, y: Float, w: Float, h: Float, v: Float, label: String, c: Color) {
         ui.rect(x, y, w, h, Ui.BUTTON)
+        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
         ui.shapes.begin(ShapeRenderer.ShapeType.Filled)
         ui.shapes.color = c; ui.shapes.rect(x, y, w, h * v)
         ui.shapes.end()

@@ -11,9 +11,9 @@ import com.northwoodsadv.ride.Platform
 import org.lwjgl.util.tinyfd.TinyFileDialogs
 import java.io.File
 
-class DesktopPlatform : Platform {
+class DesktopPlatform(touch: Boolean = false) : Platform {
     override val mapCacheDir = File(System.getProperty("user.home"), ".nwadv/cache").apply { mkdirs() }
-    override val isTouchDevice = false
+    override val isTouchDevice = touch
 
     override fun pickGpxFile(onResult: (String?, String?) -> Unit) {
         Thread {
@@ -43,6 +43,8 @@ fun main(args: Array<String>) {
     var shotsDir: String? = null
     var shotTimes = listOf<Float>()
     var camera: String? = null
+    var touch = false
+    var gpsCollapsed: Boolean? = null
     var i = 0
     while (i < args.size) {
         when (args[i]) {
@@ -51,6 +53,8 @@ fun main(args: Array<String>) {
             "--shots" -> shotsDir = args[++i]
             "--shot-times" -> shotTimes = args[++i].split(",").map { it.toFloat() }
             "--camera" -> camera = args[++i]
+            "--touch" -> touch = true
+            "--gps-collapsed" -> gpsCollapsed = true
             else -> gpx = File(args[i]).absolutePath
         }
         i++
@@ -62,12 +66,13 @@ fun main(args: Array<String>) {
         setForegroundFPS(60)
         setBackBufferConfig(8, 8, 8, 8, 24, 0, 4)
     }
-    val game = object : NwadvGame(DesktopPlatform(), gpx, auto) {
+    val game = object : NwadvGame(DesktopPlatform(touch), gpx, auto) {
         private var t = 0f
         private var shot = 0
         override fun create() {
             super.create()
             camera?.let { settings.camera = com.northwoodsadv.ride.render.CameraMode.valueOf(it) }
+            gpsCollapsed?.let { settings.gpsCollapsed = it }
         }
         override fun render() {
             super.render()

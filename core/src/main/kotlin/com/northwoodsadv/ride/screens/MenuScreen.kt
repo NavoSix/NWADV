@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.utils.Align
 import com.northwoodsadv.ride.NwadvGame
+import com.northwoodsadv.ride.physics.Difficulty
 import com.northwoodsadv.ride.physics.SteerMode
 import com.northwoodsadv.ride.render.Season
 
@@ -61,7 +62,7 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
         }
         val a = s.assists
         toggle("Steering", a.steerMode.label) { a.steerMode = if (a.steerMode == SteerMode.LEAN) SteerMode.COUNTERSTEER else SteerMode.LEAN }
-        if (game.platform.isTouchDevice) toggle("Tilt to steer", if (s.tiltSteering) "On" else "Off") { s.tiltSteering = !s.tiltSteering }
+        toggle("Difficulty", s.difficulty.label) { s.difficulty = Difficulty.entries[(s.difficulty.ordinal + 1) % Difficulty.entries.size] }
         toggle("ABS", when { a.absFront && a.absRear -> "On"; a.absFront -> "Front only"; else -> "Off" }) {
             when {
                 a.absFront && a.absRear -> a.absRear = false

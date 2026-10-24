@@ -33,4 +33,19 @@ class Assists(
     /** Rider dabs / paddles at walking pace so you don't topple over in the rocks. */
     var lowSpeedBalance: Boolean = true,
     var maxLeanDeg: Double = 52.0,
-)
+    /**
+     * 0..1: how much a stabiliser helps hold the lean you ask for and shrugs off knocks from
+     * rocks and ruts. 0 is pure physics.
+     */
+    var stability: Double = 1.0,
+    /** Multiplier on tyre grip (1 = realistic dual-sport tyres). */
+    var grip: Double = 1.4,
+) {
+    fun applyDifficulty(d: Difficulty) { stability = d.stability; grip = d.grip }
+}
+
+enum class Difficulty(val label: String, val stability: Double, val grip: Double) {
+    EASY("Easy", 1.0, 1.4),
+    NORMAL("Normal", 0.6, 1.2),
+    REALISTIC("Realistic", 0.0, 1.0),
+}

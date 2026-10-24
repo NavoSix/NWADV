@@ -33,7 +33,7 @@ public class AndroidLauncher extends AndroidApplication implements Platform {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
-        config.useAccelerometer = true;
+        config.useAccelerometer = false;
         config.useCompass = false;
         config.useGyroscope = false;
         config.useImmersiveMode = true;

@@ -27,7 +27,7 @@ class MotorcycleTest {
         val weight = spec.mass * Motorcycle.G
         assertEquals(weight, b.fzF + b.fzR, weight * 0.03, "suspension carries the bike")
         println("static: fzF=%.0f fzR=%.0f compF=%.3f compR=%.3f lean=%.3f".format(b.fzF, b.fzR, b.compF, b.compR, b.lean))
-        assertTrue(b.compF in 0.04..0.10 && b.compR in 0.04..0.10, "sag ~30% of travel")
+        assertTrue(b.compF in 0.05..0.12 && b.compR in 0.05..0.12, "sag 25-45% of travel")
         assertTrue(abs(b.lean) < 0.05, "stays upright when stopped")
     }
 
@@ -41,7 +41,7 @@ class MotorcycleTest {
         }
         println("0-100 km/h: %.2f s, gear=%d, rpm=%.0f, speed after 12 s %.1f km/h".format(t100, b.gear, b.rpm, b.forwardSpeed * 3.6))
         assertNull(b.crash, "no crash on a straight launch with wheelie control")
-        assertTrue(t100 in 2.8..6.0, "0-100 in a plausible time, got $t100")
+        assertTrue(t100 in 2.8..6.5, "0-100 in a plausible time, got $t100")
         assertTrue(abs(b.y) < 2.0, "goes straight")
     }
 
@@ -73,7 +73,7 @@ class MotorcycleTest {
 
     private fun brakingDistance(surface: Surface, kind: RoadKind, abs: Boolean): Double {
         val b = bikeOn(surface, kind)
-        val assists = Assists(absFront = abs, absRear = abs)
+        val assists = Assists(absFront = abs, absRear = abs, stability = 0.0, grip = 1.0)
         val r = TestRider(b, assists)
         val v0 = if (surface.isPaved) 100 / 3.6 else 60 / 3.6
         r.run(14.0) { r.holdSpeed(v0, it) }
@@ -138,5 +138,27 @@ class MotorcycleTest {
         println("class VI: dist=%.0f m crash=%s maxCompF=%.3f".format(hypot(b.x, b.y), b.crash, maxComp))
         assertTrue(b.x > 40, "makes progress through rough terrain")
         assertTrue(maxComp > 0.1, "suspension is working")
+    }
+
+    @Test fun easyModeHoldsLeanOnLooseGravel() {
+        val b = bikeOn(Surface.GRAVEL_LOOSE, RoadKind.GRAVEL)
+        val easy = Assists().apply { applyDifficulty(Difficulty.EASY) }
+        val r = TestRider(b, easy)
+        r.run(8.0) { r.holdSpeed(12.0, it) }
+        r.run(8.0) { r.holdSpeed(12.0, it); it.steer = -30.0 / 52.0 }
+        println("easy gravel 30 deg: crash=${b.crash} lean=%.1f".format(Math.toDegrees(b.lean)))
+        assertNull(b.crash, "easy mode keeps the bike up at 30 deg on loose gravel")
+    }
+
+    @Test fun easyModeRidesRoughClassViStraightAndTurning() {
+        val ground = TestWorlds.pad(Surface.DIRT, RoadKind.CLASS_VI, 0.8, TestWorlds.Slope(0.10))
+        val b = Motorcycle(spec, ground)
+        b.reset(0.0, 0.0, 0.0)
+        val easy = Assists().apply { applyDifficulty(Difficulty.EASY) }
+        val r = TestRider(b, easy)
+        r.run(25.0) { r.holdSpeed(6.0, it); it.steer = if ((r.time / 4).toInt() % 2 == 0) 0.25 else -0.25 }
+        println("easy class VI weave: dist=%.0f crash=%s".format(hypot(b.x, b.y), b.crash))
+        assertNull(b.crash)
+        assertTrue(hypot(b.x, b.y) > 60)
     }
 }

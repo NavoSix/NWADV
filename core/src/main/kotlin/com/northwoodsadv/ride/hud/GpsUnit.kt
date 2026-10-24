@@ -175,6 +175,33 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         field("Odo", settings.distance(bike.odometer), x + colW, r1 - row)
     }
 
+    /** Collapsed GPS: just the next instruction and distance to go, hanging from the top edge. */
+    fun drawCompact(ui: Ui, bike: Motorcycle, x: Float, top: Float, w: Float, dt: Float) {
+        val row = ui.lineHeight() + ui.u * 0.6f
+        val h = row * 2 + ui.u * 0.6f
+        val y = top - h
+        recordHeading(bike, dt)
+        ui.rect(x, y, w, h, BEZEL)
+        val t = tracker.nextTurn
+        val (msg, col) = when {
+            tracker.isOffRoute -> "Off route ${settings.distance(tracker.offRoute)}" to OFF_ROUTE
+            tracker.finished -> "Ride complete!" to BANNER
+            t != null -> "${if (abs(t.angleDeg) > 135) "U" else if (t.left) "<" else ">"} ${t.label} ${settings.distance(t.along - tracker.along)}" to BANNER
+            else -> "Follow the route" to BANNER
+        }
+        ui.rect(x + ui.u * 0.3f, y + row + ui.u * 0.3f, w - ui.u * 0.6f, row, col)
+        ui.text(msg, x + ui.u * 0.8f, y + h - ui.u * 0.6f, Color.WHITE)
+        ui.text("To end", x + ui.u * 0.8f, y + row - ui.u * 0.1f, LABEL)
+        ui.text(settings.distance(tracker.remaining), x + w - ui.u * 0.8f, y + row - ui.u * 0.1f, Color.WHITE, Align.right)
+    }
+
+    private fun recordHeading(bike: Motorcycle, dt: Float) {
+        val hd = if (bike.speed > 2) bike.course else bike.yaw
+        var dh = hd - smoothHeading
+        while (dh > PI) dh -= 2 * PI; while (dh < -PI) dh += 2 * PI
+        smoothHeading += dh * (1 - kotlin.math.exp(-dt * 4.0))
+    }
+
     private fun compass(deg: Double) = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")[(((deg + 22.5) % 360) / 45).toInt()]
 
     private fun style(l: MapLine, pass: Int): Pair<Color, Float>? {

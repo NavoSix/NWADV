@@ -25,7 +25,7 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
     // Steering head and rake.
     private val headX = 0.52f; private val headY = 1.0f
     private val rake = Math.toRadians(27.0).toFloat()
-    private val sagF = 0.057f; private val sagR = 0.061f
+    private val sagF = spec.sagFront.toFloat(); private val sagR = spec.sagRear.toFloat()
 
     init {
         val a = spec.cgToFront.toFloat(); val b = spec.cgToRear.toFloat()

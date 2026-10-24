@@ -9,6 +9,9 @@ import com.northwoodsadv.ride.world.Ground
 import com.northwoodsadv.ride.world.Road
 import com.northwoodsadv.ride.world.Surface
 
+/** Pure physics, no stabiliser or grip boost: what the realism tests measure. */
+fun realistic() = Assists(stability = 0.0, grip = 1.0)
+
 object TestWorlds {
     /** A huge flat pad of one surface centred on the origin (a 400 m wide "road" along x). */
     fun pad(surface: Surface, kind: RoadKind = RoadKind.HIGHWAY, roughness: Double = 0.0, elevation: Elevation = FlatElevation(100.0)): Ground {
@@ -24,7 +27,7 @@ object TestWorlds {
 }
 
 /** Simple speed/lean holding rider for tests. */
-class TestRider(private val bike: Motorcycle, private val assists: Assists = Assists()) {
+class TestRider(private val bike: Motorcycle, private val assists: Assists = realistic()) {
     val input = RiderInput()
     var time = 0.0
 

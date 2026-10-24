@@ -55,6 +55,7 @@ class Ui : InputAdapter(), Disposable {
     fun endFrame() { releasedAt.clear(); scrollDy = 0f }
 
     fun rect(x: Float, y: Float, rw: Float, rh: Float, c: Color) {
+        Gdx.gl.glEnable(GL20.GL_BLEND)
         shapes.begin(ShapeRenderer.ShapeType.Filled); shapes.color = c; shapes.rect(x, y, rw, rh); shapes.end()
     }
 
@@ -63,6 +64,7 @@ class Ui : InputAdapter(), Disposable {
     }
 
     fun textWidth(s: String, f: BitmapFont = font): Float { layout.setText(f, s); return layout.width }
+    fun textHeight(s: String, width: Float, f: BitmapFont = font): Float { layout.setText(f, s, Color.WHITE, width, Align.left, true); return layout.height }
     fun lineHeight(f: BitmapFont = font) = f.lineHeight
 
     /** A labelled button. Returns true on the frame it is clicked. */
@@ -114,6 +116,14 @@ class Ui : InputAdapter(), Disposable {
         }
         return Float.NaN
     }
+
+    /** Index of a held pointer that went down inside the rect, or -1. */
+    fun pointerStartedIn(x: Float, y: Float, bw: Float, bh: Float): Int {
+        for (p in 0 until 10) if (down[p] && downX[p] in x..x + bw && downY[p] in y..y + bh) return p
+        return -1
+    }
+    fun downPos(p: Int) = floatArrayOf(downX[p], downY[p])
+    fun pointerPos(p: Int) = floatArrayOf(Gdx.input.getX(p).toFloat(), h - Gdx.input.getY(p))
 
     val scroll get() = scrollDy
 

@@ -15,7 +15,7 @@ class Dashboard(private val settings: Settings) {
         val u = ui.u
         val row = ui.lineHeight() + u * 0.3f
         val h = u * 1.6f + row * 2 + u * 0.6f
-        val w = u * 38f
+        val w = u * 40f
         val x = cx - w / 2
         ui.rect(x, y, w, h, Ui.PANEL)
         // Speed and gear on the left.
@@ -44,10 +44,10 @@ class Dashboard(private val settings: Settings) {
         if (bike.standing) tags += "STAND" to Color(0.6f, 0.9f, 1f, 1f)
         if (bike.scraping) tags += "PEGS" to Color.RED
         if (bike.airborne) tags += "AIR" to Color.CYAN
+        if (bike.buddyPush) tags += "PUSH!" to Color.YELLOW
         if (bike.slipR > 1.05 || bike.slipF > 1.05) tags += "SLIDE" to Color.ORANGE
         var lx = tx
         for ((t, c) in tags) { ui.text(t, lx, r2, c); lx += ui.textWidth(t) + u * 1.0f }
-        ui.text("lean %d".format(abs(Math.toDegrees(bike.lean)).toInt()), tx + tw, r2, Color.LIGHT_GRAY, Align.right)
     }
 
     companion object { private val DIM = Color(0.55f, 0.6f, 0.55f, 1f) }

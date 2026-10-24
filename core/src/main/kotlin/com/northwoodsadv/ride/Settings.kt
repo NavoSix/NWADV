@@ -3,6 +3,7 @@ package com.northwoodsadv.ride
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Preferences
 import com.northwoodsadv.ride.physics.Assists
+import com.northwoodsadv.ride.physics.Difficulty
 import com.northwoodsadv.ride.physics.SteerMode
 import com.northwoodsadv.ride.render.CameraMode
 import com.northwoodsadv.ride.render.Season
@@ -12,9 +13,9 @@ class Settings {
     private val prefs: Preferences = Gdx.app.getPreferences("nwadv")
 
     var imperial = prefs.getBoolean("imperial", true)
-    var tiltSteering = prefs.getBoolean("tilt", Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Android)
-    /** Phone tilt (degrees) for full lean. */
-    var tiltRange = prefs.getFloat("tiltRange", 32f)
+    var difficulty = runCatching { Difficulty.valueOf(prefs.getString("difficulty", Difficulty.EASY.name)) }.getOrDefault(Difficulty.EASY)
+        set(v) { field = v; assists.applyDifficulty(v) }
+    var gpsCollapsed = prefs.getBoolean("gpsCollapsed", false)
     var season = runCatching { Season.valueOf(prefs.getString("season", Season.SUMMER.name)) }.getOrDefault(Season.SUMMER)
     var camera = runCatching { CameraMode.valueOf(prefs.getString("camera", CameraMode.CHASE.name)) }.getOrDefault(CameraMode.CHASE)
     val assists = Assists(
@@ -25,12 +26,12 @@ class Settings {
         wheelieControl = prefs.getBoolean("wheelie", true),
         autoShift = prefs.getBoolean("autoShift", true),
         lowSpeedBalance = prefs.getBoolean("balance", true),
-    )
+    ).apply { applyDifficulty(difficulty) }
 
     fun save() {
         prefs.putBoolean("imperial", imperial)
-        prefs.putBoolean("tilt", tiltSteering)
-        prefs.putFloat("tiltRange", tiltRange)
+        prefs.putString("difficulty", difficulty.name)
+        prefs.putBoolean("gpsCollapsed", gpsCollapsed)
         prefs.putString("season", season.name)
         prefs.putString("camera", camera.name)
         prefs.putString("steerMode", assists.steerMode.name)

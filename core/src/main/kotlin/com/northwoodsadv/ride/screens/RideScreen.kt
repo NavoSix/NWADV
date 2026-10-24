@@ -161,7 +161,6 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             val ahead = DoubleArray(3); world.route.pointAt((tracker.along - 6).coerceAtLeast(0.0) + 6, ahead)
             bike.reset(p[0], p[1], kotlin.math.atan2(ahead[1] - p[1], ahead[0] - p[0]))
         } else bike.reset(safeX, safeY, safeHeading)
-        controls.recenterTilt()
         chase.snap()
     }
 
@@ -175,10 +174,21 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         val ui = game.ui
         val u = ui.u
         ui.begin()
-        // GPS on the "handlebar" (top right).
+        // GPS on the "handlebar" (top right), collapsible.
         val gw = ui.w * 0.31f; val gh = ui.h * 0.50f
-        gps.draw(ui, bike, ui.w - gw - u * 1.5f, ui.h - gh - u * 1.5f, gw, gh, dt)
-        dash.draw(ui, bike, settings.assists, ui.w / 2, u * 1.2f)
+        val gx = ui.w - gw - u * 1.5f
+        val zb = u * 4.2f
+        if (settings.gpsCollapsed) {
+            val cw = ui.w * 0.26f
+            gps.drawCompact(ui, bike, ui.w - cw - u * 1.5f, ui.h - u * 1.5f, cw, dt)
+            if (ui.button("Map", ui.w - cw - u * 2.7f - zb * 2f, ui.h - u * 1.5f - zb, zb * 2f, zb)) { settings.gpsCollapsed = false; settings.save() }
+        } else {
+            gps.draw(ui, bike, gx, ui.h - gh - u * 1.5f, gw, gh, dt)
+            if (ui.button("Hide", gx - zb * 2f - u * 1.2f, ui.h - u * 1.5f - zb, zb * 2f, zb)) { settings.gpsCollapsed = true; settings.save() }
+            if (ui.button("+", gx - zb - u * 1.2f, ui.h - u * 2.5f - zb * 2, zb, zb)) gps.zoom = (gps.zoom / 1.6f).coerceAtLeast(150f)
+            if (ui.button("-", gx - zb - u * 1.2f, ui.h - u * 3.5f - zb * 3, zb, zb)) gps.zoom = (gps.zoom * 1.6f).coerceAtMost(8000f)
+        }
+        dash.draw(ui, bike, settings.assists, if (game.platform.isTouchDevice) ui.w / 2 - u * 6f else ui.w / 2, u * 1.2f)
         controls.draw(ui)
 
         // Buttons along the top left.
@@ -191,32 +201,25 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (ui.button("Stand", bx, by, bw, bh, active = controls.standToggle)) controls.standToggle = !controls.standToggle
         bx += bw + u
         if (ui.button("Auto", bx, by, bw, bh, active = autoRide)) autoRide = !autoRide
-        // Map zoom buttons sit on the GPS bezel's left edge.
-        val gx = ui.w - gw - u * 1.5f
-        val zb = u * 4.2f
-        if (ui.button("+", gx - zb - u * 1.2f, ui.h - u * 1.5f - zb, zb, zb)) gps.zoom = (gps.zoom / 1.6f).coerceAtLeast(150f)
-        if (ui.button("-", gx - zb - u * 1.2f, ui.h - u * 2.5f - zb * 2, zb, zb)) gps.zoom = (gps.zoom * 1.6f).coerceAtMost(8000f)
-        if (game.platform.isTouchDevice && settings.tiltSteering) {
-            if (ui.button("Level", gx - u * 10f, ui.h - u * 3.5f - zb * 3, u * 8.5f, zb)) controls.recenterTilt()
-        }
         if (!settings.assists.autoShift) {
-            val sx = ui.w - u * 8.5f - u * 1.5f
-            if (ui.button("Gear +", sx, ui.h * 0.52f + u * 3f, u * 8.5f, u * 4.2f)) controls.input.shiftUp = true
-            if (ui.button("Gear -", sx - u * 9.5f, ui.h * 0.52f + u * 3f, u * 8.5f, u * 4.2f)) controls.input.shiftDown = true
+            val sx = ui.w - u * 8f
+            if (ui.button("Gear +", sx, ui.h * 0.48f + u * 9f, u * 6.5f, u * 4.2f)) controls.input.shiftUp = true
+            if (ui.button("Gear -", sx - u * 7.7f, ui.h * 0.48f + u * 9f, u * 6.5f, u * 4.2f)) controls.input.shiftDown = true
         }
 
         // Messages.
         bannerTimer -= dt
-        val msgW = ui.w - gw - u * 6f
+        val msgW = ui.w - gw - u * 12f
         var my = ui.h - u * 8.5f
         if (autoRide) { ui.text("AUTO-RIDE demo: press Auto to take over", u * 1.5f, my, Ui2.AUTO, Align.left, ui.font, msgW); my -= u * 3f }
         if (bannerTimer > 0) banner?.let { ui.text(it, 0f, ui.h * 0.66f, Color.WHITE, Align.center, ui.big, ui.w) }
         notesTimer -= dt
         if (notesTimer > 0) {
             for (n in world.notes) {
-                ui.rect(u * 1.5f, my - u * 5.4f, msgW, u * 5.6f, Ui.PANEL)
-                ui.text(n, u * 2.2f, my - u * 0.4f, Color(1f, 0.85f, 0.5f, 1f), Align.left, ui.font, msgW - u * 1.4f, true)
-                my -= u * 6.2f
+                val th = ui.textHeight(n, msgW - u * 1.4f) + u * 1.4f
+                ui.rect(u * 1.5f, my - th, msgW, th, Ui.PANEL)
+                ui.text(n, u * 2.2f, my - u * 0.6f, Color(1f, 0.85f, 0.5f, 1f), Align.left, ui.font, msgW - u * 1.4f, true)
+                my -= th + u * 0.6f
             }
         }
         if (paused) drawPause()

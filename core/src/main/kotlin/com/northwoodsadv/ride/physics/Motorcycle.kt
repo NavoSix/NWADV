@@ -109,6 +109,9 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     var airborne = false; private set
     var lastImpact = 0.0; private set
     var crash: CrashReason? = null; private set
+    /** True while a riding buddy is pushing you out of a hole. */
+    var buddyPush = false; private set
+    private var stuckTime = 0.0
     var odometer = 0.0; private set
     val sampleF = GroundSample()
     val sampleR = GroundSample()
@@ -170,8 +173,11 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         engineOmega += (spec.idleRpm * 2 * PI / 60 - engineOmega) * min(1.0, dt * 3)
     }
 
+    private var stabilityNow = 0.0
+
     private fun step(dt: Double, input: RiderInput, a: Assists) {
         val m = spec.mass
+        stabilityNow = a.stability
         standing = input.standing
         val h = cgHeight
         val cy = cos(yaw); val sy = sin(yaw)
@@ -196,8 +202,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         waterDepth = max(sampleF.waterDepth, sampleR.waterDepth)
 
         val cp = cos(pitch); val sp = sin(pitch); val cl = cos(lean)
-        val extF = spec.cgHeightSeated + 0.065 + (h - spec.cgHeightSeated)
-        val extR = spec.cgHeightSeated + 0.072 + (h - spec.cgHeightSeated)
+        val extF = h + spec.sagFront
+        val extR = h + spec.sagRear
         val bottomF = z + la * sp - extF * cp * cl
         val bottomR = z - lb * sp - extR * cp * cl
         // Suspension: between the chassis and the unsprung wheel (hub position = tyre bottom).
@@ -261,7 +267,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         patchLoadF += (fzF - patchLoadF) * kzF; patchLoadR += (fzR - patchLoadR) * kzR
         if (fzF <= 0) patchLoadF = 0.0
         if (fzR <= 0) patchLoadR = 0.0
-        Tire.forces(patchLoadF, kF, tanAlphaF, lean, spec.camberStiffness, sampleF.surface, 1.0, nominalF, tire)
+        Tire.forces(patchLoadF, kF, tanAlphaF, lean, spec.camberStiffness, sampleF.surface, a.grip, nominalF, tire)
         val fxTireF = tire.fx; val fyTireF = tire.fy
         slipF = tire.utilisation
         omegaF = wheelSpin(omegaF, 0.0, brakeF, fxTireF, tire.dFxdKappa, spec.frontRadius, spec.frontWheelInertia, denomF, dt)
@@ -287,7 +293,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
             val sy = if (uR > 5.0) tanAlphaR / tan(Math.toRadians(sampleR.surface.anglePeakDeg)) else 0.0
             val slip = if (spin > 0) sqrt(sx * sx + sy * sy) else 0.0
             tcTrim = (tcTrim - dt * 6.0 * (slip - 0.95)).coerceIn(0.3, 2.5)
-            val grip = sampleR.surface.mu * max(patchLoadR, 200.0) * spec.rearRadius
+            val grip = sampleR.surface.mu * a.grip * max(patchLoadR, 200.0) * spec.rearRadius
             val drive = max(spec.engineTorque(max(rpmPre, spec.idleRpm)), 1.0) * ratio * spec.drivelineEfficiency
             limit = (grip / drive * tcTrim).coerceIn(0.0, 1.0)
             tcClutchCap = grip * tcTrim / (ratio * spec.drivelineEfficiency)
@@ -318,7 +324,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
             brakeR *= absR
             if (absR < 0.97) absActive = true
         } else absR = 1.0
-        Tire.forces(patchLoadR, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR, nominalR, tire)
+        Tire.forces(patchLoadR, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR * a.grip, nominalR, tire)
         val fxTireR = tire.fx; val fyTireR = tire.fy
         slipR = tire.utilisation
 
@@ -400,7 +406,12 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         fx -= aero * vx; fy -= aero * vy
 
         // Low-speed foot paddling: when nearly stopped the rider's feet hold the bike.
-        val lowW = if (a.lowSpeedBalance) 1 - Noise.smoothstep(1.0, 3.2, abs(u)) else 0.0
+        val lowW = if (a.lowSpeedBalance) 1 - Noise.smoothstep(1.2, 3.5 + 1.5 * a.stability, abs(u)) else 0.0
+
+        // Buddy push (easy mode): stuck with the throttle open, a riding buddy shoves you free.
+        if (a.stability >= 0.9 && throttleSmoothed > 0.4 && abs(u) < 0.5) stuckTime += dt else if (abs(u) > 1.5 || throttleSmoothed < 0.2) stuckTime = 0.0
+        buddyPush = stuckTime > 2.0
+        if (buddyPush) { fx += 0.3 * m * G * cy; fy += 0.3 * m * G * sy }
 
         // ---- integrate planar motion ---------------------------------------------------
         vx += fx / m * dt; vy += fy / m * dt
@@ -428,7 +439,10 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         // The rider's arms and legs soak up pitch, far more so when standing.
         val terrainPitchRate = (terrainPitch(gF, gR) - lastTerrainPitch) / dt
         lastTerrainPitch = terrainPitch(gF, gR)
-        pitchMoment -= (if (standing) 260.0 else 90.0) * (pitchRate - if (airborne) 0.0 else terrainPitchRate.coerceIn(-3.0, 3.0))
+        val pitchDamp = (if (standing) 260.0 else 90.0) + 450.0 * a.stability
+        pitchMoment -= pitchDamp * (pitchRate - if (airborne) 0.0 else terrainPitchRate.coerceIn(-3.0, 3.0))
+        // Stabiliser also keeps the chassis roughly parallel to the ground (no endos off rocks).
+        if (a.stability > 0) pitchMoment -= 900.0 * a.stability * (pitch - terrainPitch(gF, gR)).coerceIn(-0.6, 0.6) * if (airborne) 0.3 else 1.0
         pitchRate += pitchMoment / spec.pitchInertia * dt
         pitchRate *= exp(-dt * 0.5)
         pitch += pitchRate * dt
@@ -449,6 +463,15 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val leanGoal = if (a.steerMode == SteerMode.LEAN) -input.steer.coerceIn(-1.0, 1.0) * Math.toRadians(a.maxLeanDeg) else lean
         val bodyW = 1 - Noise.smoothstep(3.0, 9.0, abs(u))
         leanTorque += bodyW * (-900.0 * (lean - leanGoal) - 260.0 * leanRate).coerceIn(-bodyMax, bodyMax)
+        // Stability assist: a stabiliser holding the requested lean (lean mode) or damping lean
+        // changes (countersteer mode), strongest at low speed where balancing is hardest.
+        if (a.stability > 0) {
+            val goal = if (a.steerMode == SteerMode.LEAN) -input.steer.coerceIn(-1.0, 1.0) * Math.toRadians(a.maxLeanDeg) else lean
+            val lowBoost = 1 + 1.5 * (1 - Noise.smoothstep(2.0, 10.0, abs(u)))
+            val k = 1500.0 * a.stability * lowBoost; val c = 420.0 * a.stability * lowBoost
+            val lim = 1800.0 * a.stability * lowBoost
+            leanTorque += (-k * (lean - goal) - c * leanRate).coerceIn(-lim, lim)
+        }
         leanRate += leanTorque / iRoll * dt
         lean += leanRate * dt
 
@@ -480,7 +503,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val hr = ground.height(px + dy * el, py - dx * el)
         val dLong = (hf - hb) / (2 * e)
         // ...and the carcass flexes sideways, absorbing part of a glancing hit.
-        val dLat = ((hl - hr) / (2 * el)).coerceIn(-1.0, 1.0) * 0.6
+        val dLat = ((hl - hr) / (2 * el)).coerceIn(-1.0, 1.0) * 0.6 * (1 - 0.6 * stabilityNow)
         // Convert along/lateral gradient into world x/y gradient.
         grad[0] = dLong * dx - dLat * dy
         grad[1] = dLong * dy + dLat * dx
@@ -514,8 +537,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
      */
     private fun damper(v: Double, c: Double): Double {
         val av = abs(v)
-        val knee = 0.25
-        val f = if (av < knee) c * av else c * knee + c * 0.3 * (av - knee)
+        val knee = 0.2
+        val f = if (av < knee) c * av else c * knee + c * 0.22 * (av - knee)
         return f * sign(v)
     }
 
@@ -605,7 +628,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
                 // A smooth rider doesn't ask more of the front tyre than the surface offers.
                 // Falling further from the requested lean: use whatever grip it takes to save it.
                 falling = err * lean > 0 && abs(err) > 0.08
-                val corrMax = (if (falling) 0.9 else 0.45) * sampleF.surface.mu * G
+                val corrMax = (if (falling) 0.9 else 0.45) * sampleF.surface.mu * a.grip * G
                 G * tanL + (18.7 * err + 8.0 * leanErrInt).coerceIn(-corrMax, corrMax) +
                     (k2 * leanRate).coerceIn(-1.6 * corrMax, 1.6 * corrMax)
             }
@@ -616,10 +639,10 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val fFrontCmd = m * ay * fzTotalFilt.coerceAtLeast(1.0) / (m * G) - fOtherLatLast
         val surf = sampleF.surface
         val tanPeak = tan(Math.toRadians(surf.anglePeakDeg))
-        val cap = max(surf.mu * max(fzFrontFilt, 0.35 * m * G * spec.cgToRear / spec.wheelbase), 1.0)
+        val cap = max(surf.mu * a.grip * max(fzFrontFilt, 0.35 * m * G * spec.cgToRear / spec.wheelbase), 1.0)
         // Deliberately using more than ~80% of the front is what makes riders crash; the virtual
         // rider won't (the player can still exceed it by asking for more lean than grip allows).
-        val yN = (abs(fFrontCmd) / cap).coerceAtMost(if (falling || abs(G * tanL) > 0.75 * surf.mu * G) 0.97 else 0.8)
+        val yN = (abs(fFrontCmd) / cap).coerceAtMost(if (falling || abs(G * tanL) > 0.75 * surf.mu * a.grip * G) 0.97 else 0.8)
         val sN = 1 - sqrt(1 - yN)
         val corneringPerRad = 2 * surf.mu / tanPeak
         val camberEq = spec.camberStiffness * (surf.mu / 1.05).coerceAtMost(1.0) * sin(lean) / corneringPerRad

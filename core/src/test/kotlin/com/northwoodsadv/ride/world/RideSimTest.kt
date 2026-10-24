@@ -32,6 +32,7 @@ class RideSimTest {
         val auto = Autopilot(world.route, world.ground)
         val tracker = RouteTracker(world.route)
         val assists = Assists()
+        System.getenv("NWADV_DIFFICULTY")?.let { assists.applyDifficulty(com.northwoodsadv.ride.physics.Difficulty.valueOf(it)) }
         val input = RiderInput()
         val dt = 1 / 60.0
         var t = 0.0; var crashes = 0; var crashTimer = 0.0
@@ -72,6 +73,15 @@ class RideSimTest {
                     t, tracker.along, world.route.length, bike.forwardSpeed * 3.6, auto.targetSpeed * 3.6, bike.surfaceF.label, tracker.offRoute))
             }
             t += dt
+        }
+        if (System.getenv("NWADV_PROFILE_END") != null) {
+            val cy = kotlin.math.cos(bike.yaw); val sy = kotlin.math.sin(bike.yaw)
+            val gsx = GroundSample()
+            for (k in -20..20) {
+                val d = k * 0.1
+                world.ground.sample(bike.x + cy * d, bike.y + sy * d, gsx)
+                println("  ahead %.1f m: h=%.3f %s lat=%.2f".format(d, gsx.height, gsx.surface, gsx.lateral))
+            }
         }
         val wall = (System.nanoTime() - t1) / 1e9
         println("rode %.0f of %.0f m in %.0f s sim (%.1f s wall, %.2f ms/frame), crashes=%d, avg %.1f km/h".format(

@@ -26,17 +26,17 @@ class BikeSpec(
     /** Wheel, tyre, brake disc and fork lowers / swingarm share (moves with the wheel). */
     val unsprungFront: Double = 17.0,
     val unsprungRear: Double = 22.0,
-    val frontTyreStiffness: Double = 140_000.0,
-    val rearTyreStiffness: Double = 160_000.0,
+    val frontTyreStiffness: Double = 110_000.0,
+    val rearTyreStiffness: Double = 125_000.0,
 
-    val frontTravel: Double = 0.23,
-    val rearTravel: Double = 0.22,
-    val frontSpring: Double = 21_500.0,
-    val rearSpring: Double = 22_500.0,
-    val frontCompDamp: Double = 1_150.0,
-    val frontRebDamp: Double = 1_900.0,
-    val rearCompDamp: Double = 1_250.0,
-    val rearRebDamp: Double = 2_100.0,
+    val frontTravel: Double = 0.24,
+    val rearTravel: Double = 0.23,
+    val frontSpring: Double = 15_500.0,
+    val rearSpring: Double = 16_500.0,
+    val frontCompDamp: Double = 850.0,
+    val frontRebDamp: Double = 1_450.0,
+    val rearCompDamp: Double = 900.0,
+    val rearRebDamp: Double = 1_550.0,
 
     /** Engine torque curve (rpm -> N m at the crank). */
     val torqueRpm: DoubleArray = doubleArrayOf(1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6250.0, 7500.0, 8500.0, 9500.0),
@@ -59,6 +59,9 @@ class BikeSpec(
     val groundClearanceLean: Double = Math.toRadians(47.0),
 ) {
     val mass get() = massBike + massRider
+    /** Static suspension sag (m) with the rider aboard. */
+    val sagFront get() = mass * 9.81 * cgToRear / wheelbase / frontSpring
+    val sagRear get() = mass * 9.81 * cgToFront / wheelbase / rearSpring
     val cgToRear get() = wheelbase - cgToFront
 
     fun overallRatio(gear: Int) = if (gear <= 0) 0.0 else primaryRatio * gearRatios[gear - 1] * finalRatio

@@ -23,6 +23,7 @@ New Hampshire's unmaintained Class VI roads.
   connection the next time.
 
 **GPX and GPS**
+- **Collapsible.** Hide the map to a one-line next-turn strip with the Hide button.
 - **Loading.** Open GPX tracks or routes from the in-app picker, or straight from email, Drive or
   a file manager with *Open with* or *Share*.
 - **GPS display.** A track-up moving map with your route in magenta, roads styled by type (Class
@@ -55,16 +56,30 @@ New Hampshire's unmaintained Class VI roads.
 - **Crashes.** Lowsides, tip-overs, looping a wheelie, going over the bars, trees, casing a
   landing, and drowning the bike in deep water.
 
+## Difficulty
+
+The **Difficulty** setting (menu) defaults to *Easy*:
+
+- **Easy** adds a stabiliser that holds the lean you ask for and shrugs off knocks from rocks and
+  ruts, keeps the chassis level over obstacles, gives 40% more tyre grip and a riding buddy who
+  pushes you out when you're stuck in a mud hole.
+- **Normal** gives a lighter stabiliser and 20% more grip.
+- **Realistic** is pure physics.
+
+The suspension is set up plush for trail riding (about 40% sag, soft digressive damping, aired-down
+tyres).
+
 ## Controls
 
 | | Phone | Keyboard |
 |---|---|---|
-| Lean / steer | Tilt the phone like handlebars (or the on-screen strip) | A / D or arrows |
-| Throttle | Right slider | W / Up (Shift = gentle) |
-| Front brake | Left slider | S / Down |
+| Lean / steer | Joystick (left thumb, appears where you touch) | A / D or arrows |
+| Weight fore / aft | Joystick up / down | R / V |
+| Throttle | GAS slider (right edge) | W / Up (Shift = gentle) |
+| Front brake | FRONT BRAKE slider | S / Down |
 | Rear brake | REAR button | Space |
 | Stand on pegs | Stand button | F |
-| Weight fore / aft | | R / V |
+| Hide / show GPS map | Hide / Map button | |
 | Gears (manual mode) | Gear buttons | Q / E |
 | Camera | Camera button | C |
 | Map zoom | + / - | M |

@@ -291,16 +291,6 @@ object RoadFeatures {
             out.height += bump
         }
 
-        // Water bars: diagonal berms built to shed runoff off the road.
-        if (ag > 0.035 && rough > 0.3) {
-            val spacing = 40.0
-            val k = floor(s / spacing).toInt()
-            val sk = (k + 0.3 + 0.4 * Noise.rand(k, 9, seed)) * spacing
-            val u = s - sk - lat * 0.55
-            val up = if (grade > 0) 1.0 else -1.0
-            out.height += 0.2 * (0.4 + rough) * gauss(u / 0.6) - 0.12 * gauss((u - up * 0.9) / 0.45)
-        }
-
         // Mud holes in flat, low spots.
         val curvature = r.heightAt(s + 10) + r.heightAt(s - 10) - 2 * r.heightAt(s)
         val wetSpot = Noise.value1(s / 32, seed + 10) * (0.4 + rough * 0.6) +
@@ -312,6 +302,16 @@ object RoadFeatures {
             out.height -= depth
             out.surface = Surface.MUD
             if (m > 0.6 && abs(lat) < half * 0.75) { out.puddle = true; out.waterDepth = depth * 0.6 }
+        }
+
+        // Water bars: diagonal berms built to shed runoff off the road.
+        if (ag > 0.035 && rough > 0.3 && wetSpot <= -0.05) {
+            val spacing = 40.0
+            val k = floor(s / spacing).toInt()
+            val sk = (k + 0.3 + 0.4 * Noise.rand(k, 9, seed)) * spacing
+            val u = s - sk - lat * 0.55
+            val up = if (grade > 0) 1.0 else -1.0
+            out.height += 0.2 * (0.4 + rough) * gauss(u / 0.6) - 0.12 * gauss((u - up * 0.9) / 0.45)
         }
     }
 }

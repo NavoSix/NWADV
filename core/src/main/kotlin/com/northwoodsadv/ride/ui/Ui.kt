@@ -51,6 +51,24 @@ class Ui : InputAdapter(), Disposable {
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
     }
 
+    private val saved = FloatArray(3)
+
+    /**
+     * Draw into an off-screen target of [tw] x [th] pixels (e.g. a GPS screen texture) with its
+     * own size unit [tu]; [popTarget] restores the screen.
+     */
+    fun pushTarget(tw: Float, th: Float, tu: Float) {
+        saved[0] = w; saved[1] = h; saved[2] = u
+        w = tw; h = th; u = tu
+        cam.setToOrtho(false, w, h)
+        font.data.setScale(u / 7.5f)
+        begin()
+    }
+
+    fun popTarget() {
+        resize(saved[0].toInt(), saved[1].toInt())
+    }
+
     /** Call at end of frame to forget this frame's releases. */
     fun endFrame() { releasedAt.clear(); scrollDy = 0f }
 

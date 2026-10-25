@@ -9,6 +9,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.tan
 
 enum class CameraMode(val label: String) { CHASE("Chase"), HELMET("Helmet"), FAR("Far chase"), SIDE("Trackside") }
 
@@ -20,6 +21,13 @@ class ChaseCamera(val cam: PerspectiveCamera) {
     private var init = false
     private val tmpM = Matrix4()
     private val v = Vector3()
+
+    /** Helmet-camera eye positions in model space (set from the bike being ridden). */
+    val eyeSeated = Vector3(0f, 1.66f, 0f)
+    val eyeStanding = Vector3(0.25f, 1.80f, 0f)
+    /** Helmet-view look-down below the bike's horizon (radians), seated and standing. */
+    var lookDownSeated = 0.17f
+    var lookDownStanding = 0.17f
 
     val worldE get() = camE
     val worldN get() = camN
@@ -54,12 +62,14 @@ class ChaseCamera(val cam: PerspectiveCamera) {
             CameraMode.HELMET -> {
                 // Eyes in the helmet; the rider holds their head ~70% level against the lean.
                 tmpM.set(bikeTransform)
-                val head = if (bike.standing) v.set(0.25f, 1.80f, 0f) else v.set(0.0f, 1.66f, 0f)
+                val head = v.set(if (bike.standing) eyeStanding else eyeSeated)
                 head.mul(tmpM)
                 cam.position.set(head)
                 camE = head.x + originE; camN = -head.z + originN; camH = head.y + baseH
                 val fx = cos(bike.yaw).toFloat(); val fz = -sin(bike.yaw).toFloat()
-                cam.direction.set(fx, (-0.12 + 0.6 * bike.pitch).toFloat(), fz).nor()
+                // Looking a little down the road, so the cockpit (and its GPS) is in the frame.
+                val down = if (bike.standing) lookDownStanding else lookDownSeated
+                cam.direction.set(fx, (-tan(down.toDouble()) + 0.6 * bike.pitch).toFloat(), fz).nor()
                 val roll = -bike.lean * 0.3
                 cam.up.set((sin(roll) * -fz).toFloat(), cos(roll).toFloat(), (sin(roll) * fx).toFloat()).nor()
                 cam.fieldOfView = 75f

@@ -60,10 +60,11 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         if (crumbs < crumbX.size) crumbs++
     }
 
-    fun draw(ui: Ui, bike: Motorcycle, x: Float, y: Float, w: Float, h: Float, dt: Float) {
+    /** Full map; [compact] keeps one row of data fields (small device screens in the cockpit). */
+    fun draw(ui: Ui, bike: Motorcycle, x: Float, y: Float, w: Float, h: Float, dt: Float, compact: Boolean = false) {
         val sh = ui.shapes
         val row = ui.lineHeight() + ui.u * 0.4f
-        val fieldsH = row * 2 + ui.u * 0.8f
+        val fieldsH = row * (if (compact) 1 else 2) + ui.u * 0.8f
         val mapY = y + fieldsH; val mapH = h - fieldsH
         // Body.
         ui.rect(x - ui.u * 0.5f, y - ui.u * 0.5f, w + ui.u, h + ui.u, BEZEL)
@@ -171,6 +172,7 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         field("To end", settings.distance(tracker.remaining), x, r1)
         field("Elev", settings.elevation(elev), x + colW, r1)
         val deg = ((90 - Math.toDegrees(bike.course)) % 360 + 360) % 360
+        if (compact) return
         field("Hdg", "%s %03d".format(compass(deg), deg.toInt()), x, r1 - row)
         field("Odo", settings.distance(bike.odometer), x + colW, r1 - row)
     }

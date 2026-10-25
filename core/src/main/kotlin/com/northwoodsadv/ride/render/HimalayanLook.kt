@@ -22,6 +22,9 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     override val headY = 0.95f
     override val rakeDeg = 26.5
     override val rider = RiderFit(-0.20f, 0.87f, 0.0f, 0.30f, 0.39f, 1.07f, 0.34f)
+    // The phone in its Quad Lock mount above the gauges (landscape, upright, frame-mounted):
+    // the lit display just in front of the phone body.
+    override val navScreen = NavScreen(0.4795f, 1.215f, 0f, 0.150f, 0.080f)
 
     private val hi = detail == Detail.SHOWROOM
     /** Facets around lofted shells and round tubes. */

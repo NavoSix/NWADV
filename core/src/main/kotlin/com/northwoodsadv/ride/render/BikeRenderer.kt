@@ -36,6 +36,25 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
     private val rake = Math.toRadians(look.rakeDeg).toFloat()
     private val sagF = spec.sagFront.toFloat(); private val sagR = spec.sagRear.toFloat()
     private val fit = look.rider
+    /** Helmet-camera eye positions (model space), from where this bike puts its rider. */
+    val eyeSeated = Vector3(fit.hipX + 0.26f, fit.hipY + 0.64f, 0f)
+    val eyeStanding = Vector3(fit.pegX + 0.08f, fit.pegY + 1.30f, 0f)
+    val navScreen = look.navScreen
+    /** How far (radians) the helmet camera looks below the bike's horizon from each eye. */
+    val lookDownSeated = lookDown(eyeSeated)
+    val lookDownStanding = lookDown(eyeStanding)
+
+    /**
+     * A little down the road, and further down if needed to keep the nav screen in the lower part
+     * of the frame (~24 degrees below centre), wherever this bike mounts it.
+     */
+    private fun lookDown(eye: Vector3): Float {
+        val ns = navScreen ?: return 0.17f
+        val sx = ns.x + if (ns.onBars) headX else 0f
+        val sy = ns.y + if (ns.onBars) headY else 0f
+        val below = kotlin.math.atan2(eye.y - sy, sx - eye.x)
+        return (below - 0.42f).coerceIn(0.17f, 0.45f)
+    }
     private val hipX = fit.hipX + 0.06f; private val hipY = fit.hipY
 
     init {
@@ -198,7 +217,29 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
         Gdx.gl.glDisable(GL20.GL_BLEND)
     }
 
+    private val lastBase = Matrix4()
+    private var lastSteer = 0f
+
+    /**
+     * Render-space transform of the [navScreen] display for the pose last drawn, mapping 2D
+     * (0..width, 0..height) metres onto the screen with x to the rider's right and y up the
+     * display; null if this bike has none.
+     */
+    fun navTransform(out: Matrix4): Matrix4? {
+        val ns = navScreen ?: return null
+        out.set(lastBase)
+        if (ns.onBars) out.translate(headX, headY, 0f).rotateRad(axis.set(-sin(rake), cos(rake), 0f), lastSteer)
+        val t = Math.toRadians(ns.tiltDeg.toDouble())
+        val up = Vector3(-sin(t).toFloat(), cos(t).toFloat(), 0f)
+        val right = Vector3(0f, 0f, 1f)
+        val normal = Vector3(right).crs(up)
+        val o = Vector3(ns.x, ns.y, ns.z).mulAdd(right, -ns.width / 2).mulAdd(up, -ns.height / 2).mulAdd(normal, 0.0005f)
+        // Columns are the screen's axes (Matrix4.set(Vector3...) would put them in rows).
+        return out.mul(Matrix4(floatArrayOf(right.x, right.y, right.z, 0f, up.x, up.y, up.z, 0f, normal.x, normal.y, normal.z, 0f, o.x, o.y, o.z, 1f)))
+    }
+
     private fun drawBike(shader: ShaderProgram, base: Matrix4, pose: Pose, swing: Float, steer: Float, compF: Float, compR: Float, angF: Float, angR: Float) {
+        lastBase.set(base); lastSteer = steer
         shader.setUniformMatrix("u_model", base)
         when (pose) {
             Pose.FEET_DOWN -> {

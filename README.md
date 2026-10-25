@@ -106,6 +106,16 @@ python3 make_grains.py ../../assets/sounds/<bike>.grains <bike>/idle.mp3 <bike>/
 The tool measures each take's real rpm from its firing rate, so the labels don't need to be
 exact. Point the bike's `EngineSound` at the new asset (`grainAsset`).
 
+### Navigation screen
+
+In the helmet view the moving map is shown on the bike's own phone or GPS rather than the HUD
+(the speed and rpm move to the top right). Each bike's look declares where its screen is with a
+`NavScreen`: centre, lit-area width and height in metres, tilt toward the rider, and whether it
+sits on the bars (and steers) or on the frame. The map is rendered to a texture of that shape,
+and the helmet camera tilts down as far as needed to keep the screen in frame, seated or standing,
+so a new bike only needs its device's position and size. A bike without a `NavScreen` keeps the
+map on the HUD.
+
 ## Difficulty
 
 The **Difficulty** setting (menu) defaults to *Easy*:

@@ -42,8 +42,21 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val baseH = world.ground.height(world.spawnX, world.spawnY, false)
     private val chunks = ChunkManager(ChunkBuilder(world.ground, baseH, settings.season), if (Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Desktop) 3 else 2)
     private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE))
+    // In the helmet view the moving map is shown on the bike's own phone / GPS screen.
+    private val navTex: com.badlogic.gdx.graphics.glutils.FrameBuffer? = bikeRenderer.navScreen?.let { ns ->
+        val long = 512f
+        val (fw, fh) = if (ns.width >= ns.height) long to long * ns.height / ns.width else long * ns.width / ns.height to long
+        com.badlogic.gdx.graphics.glutils.FrameBuffer(com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888, fw.toInt(), fh.toInt(), false).apply {
+            colorBufferTexture.setFilter(com.badlogic.gdx.graphics.Texture.TextureFilter.Linear, com.badlogic.gdx.graphics.Texture.TextureFilter.Linear)
+        }
+    }
+    private val navRegion = navTex?.let { com.badlogic.gdx.graphics.g2d.TextureRegion(it.colorBufferTexture).apply { flip(false, true) } }
+    private val navBatch = com.badlogic.gdx.graphics.g2d.SpriteBatch(8)
+    private val navM = Matrix4()
+    private val gpsOnBike get() = navTex != null && chase.mode == CameraMode.HELMET
     private val cam = PerspectiveCamera(62f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-    private val chase = ChaseCamera(cam).apply { mode = settings.camera }
+    private val chase = ChaseCamera(cam).apply { mode = settings.camera; eyeSeated.set(bikeRenderer.eyeSeated); eyeStanding.set(bikeRenderer.eyeStanding)
+        lookDownSeated = bikeRenderer.lookDownSeated; lookDownStanding = bikeRenderer.lookDownStanding }
     private val gps = GpsUnit(world, tracker, settings)
     private val dash = Dashboard(settings)
     private val bikeM = Matrix4()
@@ -132,6 +145,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         chase.update(dt, bike, world.ground, originE, originN, baseH, bikeM)
         chunks.update(chase.worldE, chase.worldN, 4500.0)
 
+        if (gpsOnBike) drawNavTexture(dt)
         Gdx.gl.glClearColor(sky[0], sky[1], sky[2], 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         time += dt
@@ -173,6 +187,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         bikeRenderer.render(shader, bike, originE, originN, baseH, world.ground.height(bike.x, bike.y))
         shader.setUniformf("u_light", 1f)
         Gdx.gl.glDisable(GL20.GL_CULL_FACE)
+        if (gpsOnBike) drawNavScreen()
         chunks.renderWater(shader, cam, originE, originN)
         wake.render(shader, originE, originN, baseH)
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
@@ -217,6 +232,37 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         settings.camera = chase.mode; settings.save()
     }
 
+    /** Draw the moving map into the bike's nav-screen texture, laid out for that screen's size. */
+    private fun drawNavTexture(dt: Float) {
+        val fb = navTex ?: return
+        val ui = game.ui
+        val fw = fb.width.toFloat(); val fh = fb.height.toFloat()
+        fb.begin()
+        Gdx.gl.glClearColor(0.05f, 0.06f, 0.07f, 1f)
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+        // Big type for a small screen seen from the saddle: ~12 text lines on the short side.
+        val tu = minOf(fw, fh) / 15f
+        ui.pushTarget(fw, fh, tu)
+        gps.draw(ui, bike, tu * 0.5f, tu * 0.5f, fw - tu, fh - tu, dt, compact = true)
+        ui.popTarget()
+        fb.end()
+    }
+
+    /** The map on the phone / GPS, lit by its own backlight, in the 3D scene. */
+    private fun drawNavScreen() {
+        val region = navRegion ?: return
+        val ns = bikeRenderer.navScreen ?: return
+        bikeRenderer.navTransform(navM) ?: return
+        navBatch.projectionMatrix = cam.combined
+        navBatch.transformMatrix = navM
+        navBatch.begin()
+        navBatch.draw(region, 0f, 0f, ns.width, ns.height)
+        navBatch.end()
+        Gdx.gl.glDepthMask(true)
+        Gdx.gl.glDisable(GL20.GL_BLEND)
+        shader.bind()
+    }
+
     private fun drawHud(dt: Float) {
         val ui = game.ui
         val u = ui.u
@@ -225,7 +271,11 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         val gw = ui.w * 0.31f; val gh = ui.h * 0.50f
         val gx = ui.w - gw - u * 1.5f
         val zb = u * 4.2f
-        if (settings.gpsCollapsed) {
+        if (gpsOnBike) {
+            // The map is on the bike's own screen; keep just the zoom buttons.
+            if (ui.button("+", ui.w - zb - u * 1.5f, ui.h - u * 1.5f - zb, zb, zb)) gps.zoom = (gps.zoom / 1.6f).coerceAtLeast(150f)
+            if (ui.button("-", ui.w - zb - u * 1.5f, ui.h - u * 2.5f - zb * 2, zb, zb)) gps.zoom = (gps.zoom * 1.6f).coerceAtMost(8000f)
+        } else if (settings.gpsCollapsed) {
             val cw = ui.w * 0.26f
             gps.drawCompact(ui, bike, ui.w - cw - u * 1.5f, ui.h - u * 1.5f, cw, dt)
             if (ui.button("Map", ui.w - cw - u * 2.7f - zb * 2f, ui.h - u * 1.5f - zb, zb * 2f, zb)) { settings.gpsCollapsed = false; settings.save() }
@@ -235,7 +285,9 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             if (ui.button("+", gx - zb - u * 1.2f, ui.h - u * 2.5f - zb * 2, zb, zb)) gps.zoom = (gps.zoom / 1.6f).coerceAtLeast(150f)
             if (ui.button("-", gx - zb - u * 1.2f, ui.h - u * 3.5f - zb * 3, zb, zb)) gps.zoom = (gps.zoom * 1.6f).coerceAtMost(8000f)
         }
-        dash.draw(ui, bike, settings.assists, if (game.platform.isTouchDevice) ui.w / 2 - u * 6f else ui.w / 2, u * 1.2f)
+        // In the helmet view the cockpit is at the bottom of the screen, so the readout moves up.
+        if (gpsOnBike) dash.draw(ui, bike, settings.assists, ui.w - u * 27.5f, ui.h - u * 10.7f)
+        else dash.draw(ui, bike, settings.assists, if (game.platform.isTouchDevice) ui.w / 2 - u * 6f else ui.w / 2, u * 1.2f)
         controls.draw(ui)
 
         // Buttons along the top left.
@@ -295,6 +347,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     override fun dispose() {
         chunks.dispose(); shader.dispose(); bikeRenderer.dispose(); audio.dispose()
         skyShader.dispose(); skyQuad.dispose(); wake.dispose()
+        navTex?.dispose(); navBatch.dispose()
     }
 
     private object Ui2 { val AUTO = Color(0.6f, 0.9f, 1f, 1f) }

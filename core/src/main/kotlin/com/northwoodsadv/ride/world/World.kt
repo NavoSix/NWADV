@@ -110,7 +110,8 @@ class WorldBuilder(private val cache: DiskCache) {
             val xs = DoubleArray(w.points.size) { proj.east(w.points[it].lon) }
             val ys = DoubleArray(w.points.size) { proj.north(w.points[it].lat) }
             Road.splitLong(xs, ys).map { Stream(it, width, ww == "river") }
-        }.flatten()
+        }.flatten().toMutableList()
+        devStreams(route, streams)
         val areas = osm.areas.mapNotNull { a ->
             val code = Landcover.codeFor(a.tags) ?: return@mapNotNull null
             val rings = (a.outers + a.inners).map { ring ->
@@ -185,6 +186,21 @@ class WorldBuilder(private val cache: DiskCache) {
                 i = j
             }
             return out
+        }
+
+        /**
+         * Development: system property nwadv.devStreams = comma-separated route distances, each
+         * gets a straight 3 m stream across the route (for checking fords without map data).
+         */
+        fun devStreams(route: Polyline, out: MutableList<Stream>) {
+            val at = System.getProperty("nwadv.devStreams") ?: return
+            val p = DoubleArray(3)
+            for (s in at.split(",").mapNotNull { it.trim().toDoubleOrNull() }) {
+                route.pointAt(s, p)
+                val lx = -kotlin.math.sin(p[2]); val ly = kotlin.math.cos(p[2])
+                val xs = DoubleArray(25) { p[0] + lx * (it - 12) * 5.0 }; val ys = DoubleArray(25) { p[1] + ly * (it - 12) * 5.0 }
+                out += Stream(Polyline(xs, ys), 3.0, false)
+            }
         }
 
         /** A world without any downloads, for tests and the offline demo. */

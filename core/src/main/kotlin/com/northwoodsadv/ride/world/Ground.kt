@@ -28,6 +28,10 @@ class GroundSample {
     var grassStrip = false
     /** Standing water in a mud hole (render hint). */
     var puddle = false
+    /** 0..1: on the exposed face of a road cut (render hint). */
+    var cutFace = 0.0
+    /** Height of the water surface here (streams, fords, lakes), or NaN when dry. */
+    var waterLevel = Double.NaN
 }
 
 class Stream(val line: Polyline, val width: Double, val river: Boolean)
@@ -57,7 +61,7 @@ class Ground(
         RoadKind.GRAVEL -> 0.8; RoadKind.CLASS_VI -> 0.4; RoadKind.TRAIL -> 0.2
     }
 
-    private fun influence(r: Road) = r.halfWidth + shoulder(r) + BLEND + 0.5
+    private fun influence(r: Road) = r.halfWidth + shoulder(r) + EARTHWORK + 0.5
 
     /** Distance from (e, n) to the edge of the nearest road (negative = on the road). */
     fun roadClearance(e: Double, n: Double): Double {
@@ -85,6 +89,21 @@ class Ground(
         return true
     }
 
+    /** Nearest road hit to (e, n) within [maxDist], or false. */
+    fun nearestRoadHit(e: Double, n: Double, maxDist: Double, out: SegmentIndex.Hit): Boolean {
+        val hits = hitsTL.get()
+        val cnt = roadIndex.nearestPerLine(e, n, maxOf(maxDist, maxInfluence), hits)
+        var best = -1; var bestD = Double.MAX_VALUE
+        for (k in 0 until cnt) {
+            val d = hits[k].dist - roads[hits[k].line].halfWidth
+            if (hits[k].dist <= maxDist && d < bestD) { bestD = d; best = k }
+        }
+        if (best < 0) return false
+        val h = hits[best]
+        out.line = h.line; out.along = h.along; out.lateral = h.lateral; out.dist = h.dist; out.heading = h.heading
+        return true
+    }
+
     fun streamClearance(e: Double, n: Double): Double {
         val hits = hitsTL.get()
         val cnt = streamIndex.nearestPerLine(e, n, 30.0, hits)
@@ -107,33 +126,55 @@ class Ground(
     fun sample(e: Double, n: Double, out: GroundSample, micro: Boolean = true, obstacles: Boolean = true): GroundSample {
         val terrain = elevation.height(e, n)
         out.height = terrain; out.road = -1; out.onRoad = false; out.roadBlend = 0.0
-        out.waterDepth = 0.0; out.grassStrip = false; out.puddle = false
+        out.waterDepth = 0.0; out.grassStrip = false; out.puddle = false; out.cutFace = 0.0
+        out.waterLevel = Double.NaN
         out.landcover = landcover.at(e, n)
 
         // --- road grading --------------------------------------------------------------
         val hits = hitsTL.get()
         val cnt = roadIndex.nearestPerLine(e, n, maxInfluence, hits)
         var sumW = 0.0; var sumH = 0.0; var maxW = 0.0; var best = -1; var bestD = Double.MAX_VALUE
+        var cut = 0.0; var rock = 0.0
         for (k in 0 until cnt) {
             val h = hits[k]; val r = roads[h.line]
             val flat = r.halfWidth + shoulder(r)
-            if (h.dist > flat + BLEND) continue
-            val w = 1 - Noise.smoothstep(flat, flat + BLEND, h.dist)
-            val crown = if (r.spec.surface.isPaved) -0.02 * minOf(h.dist, r.halfWidth) else -0.035 * minOf(h.dist, r.halfWidth)
-            sumW += w; sumH += w * (r.heightAt(h.along) + crown)
+            if (h.dist > flat + EARTHWORK) continue
+            val bank = r.bankAt(h.along)
+            // A banked bend is one tilted plane; the crown only shows on the straights.
+            val crownK = 1 - minOf(1.0, abs(bank) / 0.03)
+            val crown = (if (r.spec.surface.isPaved) -0.02 else -0.035) * minOf(h.dist, r.halfWidth) * crownK
+            val roadH = r.heightAt(h.along) + crown - bank * h.lateral.coerceIn(-flat, flat)
+            // Earthwork: a straight bank from the shoulder at the cut or fill angle until it
+            // meets the natural ground (blending linearly over that width gives that slope).
+            val dh = terrain - roadH
+            val slope = if (dh > 0) r.cutSlope(h.along) else r.fillSlope
+            val width = (abs(dh) / slope).coerceIn(MIN_BANK, EARTHWORK)
+            val w = 1 - ((h.dist - flat) / width).coerceIn(0.0, 1.0)
+            if (w <= 0) continue
+            // Each road's own earthwork surface; where several overlap the most "inside" one wins
+            // (sharply weighted), so the other leg of a hairpin metres above or below can't
+            // bleed into this road's surface. Roads meeting at a junction (both flat) average.
+            val ew = terrain + (roadH - terrain) * w
+            val v = (w * w).let { it * it }.let { it * it }
+            sumW += v; sumH += v * ew
             if (w > maxW) maxW = w
+            if (dh > 0.3 && w < 1 && w > 0) {
+                val c = Noise.smoothstep(0.3, 1.2, dh) * Noise.smoothstep(0.0, 0.15, w) * Noise.smoothstep(1.0, 0.9, w)
+                if (c > cut) { cut = c; rock = r.rockCut(h.along) }
+            }
             if (h.dist - r.halfWidth < bestD) { bestD = h.dist - r.halfWidth; best = k }
         }
+        out.cutFace = cut
         var bestRoad: Road? = null
         if (sumW > 0) {
-            out.height = terrain * (1 - maxW) + (sumH / sumW) * maxW
+            out.height = sumH / sumW
             out.roadBlend = maxW
             val h = hits[best]; bestRoad = roads[h.line]
             out.road = h.line; out.lateral = h.lateral; out.along = h.along; out.roadHeading = h.heading
             val r = bestRoad
             val ad = h.dist
             // Roadside ditch (maintained roads only).
-            if (!r.spec.isClassVI && !r.spec.bridge) {
+            if (!r.spec.isClassVI && !r.spec.bridge && terrain > out.height - 0.3) {
                 val c = r.halfWidth + shoulder(r) + 1.1
                 val depth = if (r.spec.kind == RoadKind.HIGHWAY) 0.7 else 0.45
                 out.height -= depth * gauss((ad - c) / 0.8)
@@ -145,7 +186,7 @@ class Ground(
                     r.spec.kind == RoadKind.GRAVEL -> Surface.GRAVEL_LOOSE
                     else -> Surface.DIRT
                 }
-                else -> out.surface = landSurface(out.landcover, terrain)
+                else -> out.surface = if (cut > 0.3) (if (rock > 0.5) Surface.ROCK else Surface.DIRT) else landSurface(out.landcover, terrain)
             }
             if (micro && ad <= r.halfWidth + shoulder(r)) RoadFeatures.apply(r, h.along, h.lateral, out)
             // Fallen trees and big rocks on Class VI (logs reach past the road edges).
@@ -167,8 +208,12 @@ class Ground(
                 val depthMax = if (ford) 0.28 else if (st.river) 1.4 else 0.45
                 val prof = 1 - (hits[k].dist / half).let { it * it }
                 val d = depthMax * prof
+                val before = out.height
                 out.height -= d
                 if (hits[k].dist < st.width / 2) {
+                    // Flat across the channel: the bed at the centre plus its depth.
+                    val level = before - depthMax * 0.2
+                    if (out.waterLevel.isNaN() || level > out.waterLevel) out.waterLevel = level
                     out.waterDepth = maxOf(out.waterDepth, d * 0.8)
                     out.surface = if (!ford && st.river && d > 0.8) Surface.DEEP_WATER else Surface.WATER
                 }
@@ -176,6 +221,7 @@ class Ground(
         }
         if (out.landcover == Landcover.WATER && out.roadBlend < 0.5) {
             out.surface = Surface.DEEP_WATER; out.waterDepth = 1.5
+            out.waterLevel = terrain + 0.05
         }
 
         // --- off-road micro relief -------------------------------------------------------
@@ -203,6 +249,10 @@ class Ground(
 
     companion object {
         const val BLEND = 5.0
+        /** Widest cut or fill slope (m); beyond it a very deep cut just gets steeper. */
+        const val EARTHWORK = 12.0
+        /** Narrowest bank: even on flat ground the shoulder rolls off gently. */
+        const val MIN_BANK = 1.5
         const val BANK = 1.5
         /** Approximate treeline in the White Mountains. */
         const val TREELINE = 1450.0

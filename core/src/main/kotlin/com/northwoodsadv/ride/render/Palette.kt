@@ -7,11 +7,11 @@ import com.northwoodsadv.ride.world.Surface
 
 /** Colours for ground surfaces. Alpha < 1 marks forest floor (see [WorldShader]). */
 object Palette {
-    const val SKY = 0x9cc3e4
+    const val SKY = 0x6a9ad4
     const val HAZE = 0xc4d4e0
     const val CANOPY = 0x2c4426
 
-    fun ground(s: GroundSample, e: Double, n: Double, near: Boolean): Float {
+    fun ground(s: GroundSample, e: Double, n: Double, near: Boolean, light: Double = 1.0): Float {
         val jitter = (Noise.value2(e * 0.08, n * 0.08, 77) - 0.5) * 0.18
         var rgb = when (s.surface) {
             Surface.FOREST -> if (Noise.value2(e * 0.2, n * 0.2, 9) > 0.6) 0x5a5030 else 0x4a4a2a
@@ -22,7 +22,7 @@ object Palette {
         if (s.puddle) rgb = 0x5a6e78
         if (s.surface == Surface.ROCK && s.road < 0) rgb = 0x8c8c86
         val forestFloor = s.surface == Surface.FOREST
-        return shade(rgb, 1 + jitter, if (forestFloor) 0f else 1f)
+        return shade(rgb, (1 + jitter) * light, if (forestFloor) 0f else 1f)
     }
 
     fun shade(rgb: Int, k: Double, alpha: Float = 1f): Float {

@@ -1,5 +1,6 @@
 package com.northwoodsadv.ride.render
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.Mesh
 import com.badlogic.gdx.graphics.glutils.ShaderProgram
@@ -106,13 +107,18 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         wheelF = wheel(rf); wheelR = wheel(rr)
 
         val sm = MeshBuilder(64)
-        val sc = MeshBuilder.color(0.16f, 0.15f, 0.12f)
-        val c0 = sm.vertex(0f, 0f, 0f, 0f, 1f, 0f, sc)
+        // Soft contact shadow: dark in the middle, fading to nothing at the rim (drawn blended).
+        val c0 = sm.vertex(0f, 0f, 0f, 0f, 1f, 0f, MeshBuilder.color(0.02f, 0.02f, 0.02f, 0.62f))
         for (i in 0..16) {
             val t = i / 16f * MeshBuilder.TWO_PI
-            sm.vertex(cos(t) * 0.95f, 0f, sin(t) * 0.32f, 0f, 1f, 0f, MeshBuilder.color(0.3f, 0.28f, 0.22f))
+            sm.vertex(cos(t) * 0.6f, 0f, sin(t) * 0.22f, 0f, 1f, 0f, MeshBuilder.color(0.02f, 0.02f, 0.02f, 0.45f))
+        }
+        for (i in 0..16) {
+            val t = i / 16f * MeshBuilder.TWO_PI
+            sm.vertex(cos(t) * 1.15f, 0f, sin(t) * 0.48f, 0f, 1f, 0f, MeshBuilder.color(0.02f, 0.02f, 0.02f, 0f))
         }
         for (i in 1..16) sm.tri(c0, i + 1, i)
+        for (i in 1..16) { val a = i; val b = i + 1; val c = i + 17; val d = i + 18; sm.tri(a, b, d); sm.tri(a, d, c) }
         shadow = toMesh(sm)
     }
 
@@ -154,7 +160,14 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         m.idt().translate((bike.x - originE).toFloat(), (groundHere - baseH + 0.04).toFloat(), (-(bike.y - originN)).toFloat())
             .rotateRad(0f, 1f, 0f, bike.yaw.toFloat())
         shader.setUniformMatrix("u_model", m)
+        Gdx.gl.glEnable(GL20.GL_BLEND)
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+        Gdx.gl.glDepthMask(false)
+        shader.setUniformf("u_mode", ChunkManager.MODE_FX)
         shadow.render(shader, GL20.GL_TRIANGLES)
+        shader.setUniformf("u_mode", ChunkManager.MODE_OBJECT)
+        Gdx.gl.glDepthMask(true)
+        Gdx.gl.glDisable(GL20.GL_BLEND)
 
         shader.setUniformMatrix("u_model", base)
         if (bike.feetDown && !bike.standing) {

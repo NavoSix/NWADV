@@ -17,6 +17,13 @@ New Hampshire's unmaintained Class VI roads.
 - **Terrain** comes from USGS 3DEP elevation (AWS Terrain Tiles): roughly 7 m detail along your
   route and coarser tiles around it. Roads are graded into the terrain, with ditches, crowns and
   bridges.
+- **Earthworks.** Where a road runs across a hillside it is cut into it: a steep bank of bare
+  soil on the uphill side (blasted rock cuts in places on maintained roads) and a built-up fill
+  slope on the downhill side.
+- **Banked corners.** Paved and gravel roads are banked through their bends, more on the faster
+  roads.
+- **Woods.** In stretches of back road and Class VI the canopy closes overhead: roadside trees
+  lean out over the road and the light under them is dappled shade.
 - **Unmapped sections.** Any part of your GPX that isn't on a mapped road is ridden as an
   unmaintained trail.
 - **Offline after first load.** Everything downloaded is cached, so a ride works without a
@@ -57,6 +64,11 @@ New Hampshire's unmaintained Class VI roads.
   - Shift your weight forward or back.
   - In the air, throttle and rear brake pitch the bike, just as they do on a real bike.
   - Hold the rear brake at a standstill with no throttle to paddle backwards with your feet.
+- **Water crossings** have a water surface with moving ripples. Riding through throws a wake of
+  rings off both wheels and spray off the front.
+- **Sound.** The engine, wind and tyres are synthesised from the physics. The tyres sound
+  different on each surface (gravel crunch, rock knocks, mud, splashing water) without harsh
+  static.
 - **Crashes.** Lowsides, tip-overs, looping a wheelie, going over the bars, trees, casing a
   landing, and drowning the bike in deep water. After a crash, or any time from the pause
   menu with **Reset position**, you're put back on the route a few metres behind.

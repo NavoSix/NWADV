@@ -18,7 +18,7 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Streams terrain around the camera with a quadtree of detail levels (128 m chunks at 2 m
+ * Streams terrain around the camera with a quadtree of detail levels (128 m chunks at 1.3 m
  * resolution near the rider, up to 2 km chunks at 32 m on the horizon). Chunk geometry is built
  * on worker threads and uploaded a few per frame.
  */
@@ -27,9 +27,9 @@ class ChunkManager(private val builder: ChunkBuilder, threads: Int) : Disposable
         override fun compareTo(other: Job) = compareValuesBy(this, other, { it.priority }, { it.seq })
     }
 
-    class Chunk(val data: ChunkData, val terrain: Mesh, val roads: Mesh?, val trees: Mesh?, val bounds: BoundingBox) {
+    class Chunk(val data: ChunkData, val terrain: Mesh, val roads: Mesh?, val trees: List<Mesh>, val water: Mesh?, val bounds: BoundingBox) {
         var lastNeeded = 0L
-        fun dispose() { terrain.dispose(); roads?.dispose(); trees?.dispose() }
+        fun dispose() { terrain.dispose(); roads?.dispose(); trees.forEach { it.dispose() }; water?.dispose() }
     }
 
     private val ready = HashMap<Long, Chunk>()
@@ -118,12 +118,13 @@ class ChunkManager(private val builder: ChunkBuilder, threads: Int) : Disposable
     private fun upload(d: ChunkData): Chunk {
         val t = toMesh(d.terrain)
         val r = d.roads?.let(::toMesh)
-        val tr = d.trees?.let(::toMesh)
+        val tr = d.trees.parts.filter { it.vertCount > 0 }.map(::toMesh)
+        val wa = d.water?.let(::toMesh)
         var minY = d.terrain.minY; var maxY = d.terrain.maxY
-        d.trees?.let { maxY = max(maxY, it.maxY) }
+        for (p in d.trees.parts) if (p.vertCount > 0) maxY = max(maxY, p.maxY)
         if (minY > maxY) { minY = 0f; maxY = 0f }
         val bb = BoundingBox(Vector3(0f, minY, -d.size.toFloat()), Vector3(d.size.toFloat(), maxY, 0f))
-        return Chunk(d, t, r, tr, bb)
+        return Chunk(d, t, r, tr, wa, bb)
     }
 
     private fun toMesh(m: MeshBuilder): Mesh {
@@ -157,22 +158,49 @@ class ChunkManager(private val builder: ChunkBuilder, threads: Int) : Disposable
             }
         }
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+        lastVisible = visible
         for (pass in 0..2) {
             if (pass == 1) { Gdx.gl.glDisable(GL20.GL_CULL_FACE); Gdx.gl.glEnable(GL20.GL_POLYGON_OFFSET_FILL); Gdx.gl.glPolygonOffset(-1f, -2f) }
             if (pass == 2) { Gdx.gl.glDisable(GL20.GL_POLYGON_OFFSET_FILL); Gdx.gl.glEnable(GL20.GL_CULL_FACE) }
+            shader.setUniformf("u_mode", if (pass == 2) MODE_OBJECT else MODE_GROUND)
             for (k in visible) {
                 val c = ready[k] ?: continue
                 val ox = (c.data.e0 - originE).toFloat(); val oz = (-(c.data.n0 - originN)).toFloat()
                 tmpMin.set(c.bounds.min).add(ox, 0f, oz); tmpMax.set(c.bounds.max).add(ox, 0f, oz)
                 tmpBox.set(tmpMin, tmpMax)
                 if (!cam.frustum.boundsInFrustum(tmpBox)) continue
-                val mesh = when (pass) { 0 -> c.terrain; 1 -> c.roads; else -> c.trees } ?: continue
                 shader.setUniformf("u_offset", ox, 0f, oz)
-                mesh.render(shader, GL20.GL_TRIANGLES)
+                when (pass) {
+                    0 -> c.terrain.render(shader, GL20.GL_TRIANGLES)
+                    1 -> c.roads?.render(shader, GL20.GL_TRIANGLES)
+                    else -> for (t in c.trees) t.render(shader, GL20.GL_TRIANGLES)
+                }
                 if (pass == 0) drawn++
             }
         }
         Gdx.gl.glDisable(GL20.GL_POLYGON_OFFSET_FILL)
+    }
+
+    private var lastVisible: Set<Long> = emptySet()
+
+    /** Water surfaces of the chunks drawn by the last [render], blended over the bed. */
+    fun renderWater(shader: ShaderProgram, cam: PerspectiveCamera, originE: Double, originN: Double) {
+        Gdx.gl.glDisable(GL20.GL_CULL_FACE)
+        Gdx.gl.glEnable(GL20.GL_BLEND)
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+        shader.setUniformf("u_mode", MODE_WATER)
+        for (k in lastVisible) {
+            val c = ready[k] ?: continue
+            val mesh = c.water ?: continue
+            val ox = (c.data.e0 - originE).toFloat(); val oz = (-(c.data.n0 - originN)).toFloat()
+            tmpMin.set(c.bounds.min).add(ox, 0f, oz); tmpMax.set(c.bounds.max).add(ox, 0f, oz)
+            tmpBox.set(tmpMin, tmpMax)
+            if (!cam.frustum.boundsInFrustum(tmpBox)) continue
+            shader.setUniformf("u_offset", ox, 0f, oz)
+            mesh.render(shader, GL20.GL_TRIANGLES)
+        }
+        Gdx.gl.glDisable(GL20.GL_BLEND)
+        shader.setUniformf("u_mode", MODE_OBJECT)
     }
 
     /** Throw everything away (e.g. after changing the season). */
@@ -192,6 +220,11 @@ class ChunkManager(private val builder: ChunkBuilder, threads: Int) : Disposable
 
     companion object {
         const val MAX_LEVEL = 4
+        /** WorldShader u_mode: ground (terrain, roads), objects (trees, bike), water, effects. */
+        const val MODE_GROUND = 0f
+        const val MODE_OBJECT = 1f
+        const val MODE_WATER = 2f
+        const val MODE_FX = 3f
         const val SPLIT = 1.25
         val ATTRS = VertexAttributes(VertexAttribute.Position(), VertexAttribute.Normal(), VertexAttribute.ColorPacked())
     }

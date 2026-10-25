@@ -31,4 +31,20 @@ class RideSynthTest {
             }
         }
     }
+
+    /** Surface noise should be soft texture: most of its energy well below the hiss band. */
+    @Test fun surfaceSoundsAreNotHarsh() {
+        for (sf in SurfaceSound.entries) {
+            val s = RideSynth(22050)
+            s.rpm = 600.0; s.throttle = 0.0; s.speed = 15.0; s.surface = sf
+            val buf = FloatArray(512)
+            repeat(20) { s.fill(buf) }
+            var e = 0.0; var d = 0.0; var last = 0f; var n = 0
+            repeat(80) { s.fill(buf); for (x in buf) { e += x * x; d += (x - last) * (x - last); last = x; n++ } }
+            val rms = sqrt(e / n); val hf = sqrt(d / e)
+            println("%-7s rms=%.4f hf=%.3f".format(sf, rms, hf))
+            assertTrue(hf < 0.6, "$sf surface sound is too hissy ($hf)")
+            assertTrue(rms < 0.25, "$sf surface sound is too loud ($rms)")
+        }
+    }
 }

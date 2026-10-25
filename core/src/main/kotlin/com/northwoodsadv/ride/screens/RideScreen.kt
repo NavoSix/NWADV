@@ -21,9 +21,11 @@ import com.northwoodsadv.ride.render.ChaseCamera
 import com.northwoodsadv.ride.render.ChunkBuilder
 import com.northwoodsadv.ride.render.ChunkManager
 import com.northwoodsadv.ride.render.Palette
+import com.northwoodsadv.ride.render.WakeFx
 import com.northwoodsadv.ride.render.WorldShader
 import com.northwoodsadv.ride.route.RouteTracker
 import com.northwoodsadv.ride.ui.Ui
+import com.northwoodsadv.ride.world.Canopy
 import com.northwoodsadv.ride.world.World
 import kotlin.math.abs
 import kotlin.math.floor
@@ -49,6 +51,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var originE = 0.0; private var originN = 0.0
 
     private var paused = false
+    /** Development: hide the HUD for clean screenshots (desktop --no-hud). */
+    private val noHud = System.getProperty("nwadv.noHud") != null
     private var crashTimer = 0.0
     private var safeTimer = 0.0
     private var safeX = world.spawnX; private var safeY = world.spawnY; private var safeHeading = world.spawnHeading
@@ -59,6 +63,15 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val sky = Palette.rgb(Palette.SKY)
     private val haze = Palette.rgb(Palette.HAZE)
     private val canopy = Palette.rgb(Palette.CANOPY)
+    private val skyShader = WorldShader.createSky()
+    private val skyQuad = com.badlogic.gdx.graphics.Mesh(true, 4, 6, com.badlogic.gdx.graphics.VertexAttribute.Position()).apply {
+        setVertices(floatArrayOf(-1f, -1f, 0f, 1f, -1f, 0f, 1f, 1f, 0f, -1f, 1f, 0f))
+        setIndices(shortArrayOf(0, 1, 2, 0, 2, 3))
+    }
+    private val wake = WakeFx(world.ground)
+    private val lightSample = com.northwoodsadv.ride.world.GroundSample()
+    private var bikeLight = 1f
+    private var time = 0f
 
     init {
         bike.reset(world.spawnX, world.spawnY, world.spawnHeading)
@@ -66,8 +79,11 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         System.getProperty("nwadv.startAt")?.toDoubleOrNull()?.let { at ->
             val p = DoubleArray(3); world.route.pointAt(at, p); bike.reset(p[0], p[1], p[2])
         }
-        System.getProperty("nwadv.startRoadAt")?.toDoubleOrNull()?.let { at ->
-            val p = DoubleArray(3); world.roads[0].line.pointAt(at, p); bike.reset(p[0], p[1], p[2])
+        // ... or along a road: "<metres>" on the first road, or "<road>:<metres>".
+        System.getProperty("nwadv.startRoadAt")?.split(":")?.let { parts ->
+            val road = if (parts.size > 1) parts[0].toIntOrNull() ?: 0 else 0
+            val at = parts.last().toDoubleOrNull() ?: return@let
+            val p = DoubleArray(3); world.roads[road.coerceIn(0, world.roads.size - 1)].line.pointAt(at, p); bike.reset(p[0], p[1], p[2])
         }
         rebase(true)
         banner = world.name; bannerTimer = 4.0
@@ -107,7 +123,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         audio.throttle = controls.input.throttle.toFloat()
         audio.speed = bike.speed.toFloat()
         audio.slip = maxOf(bike.slipF, bike.slipR).toFloat()
-        audio.loose = if (bike.surfaceF.isLoose && !bike.airborne) 1f else 0f
+        audio.surface = com.northwoodsadv.ride.audio.SurfaceSound.of(bike.surfaceF, bike.airborne)
         audio.muted = paused
 
         // --- 3D -----------------------------------------------------------------------------
@@ -118,27 +134,51 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
 
         Gdx.gl.glClearColor(sky[0], sky[1], sky[2], 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+        time += dt
+        if (!paused) wake.update(dt.toDouble(), bike)
+        // Shade under the canopy, eased so riding into a tunnel of trees darkens gradually.
+        world.ground.sample(bike.x, bike.y, lightSample, false)
+        val lightHere = if (lightSample.road >= 0) Canopy.light(world.ground, world.ground.roads[lightSample.road], lightSample.along, lightSample.lateral, bike.x, bike.y) else 1.0
+        bikeLight += (lightHere.toFloat() - bikeLight) * (1 - kotlin.math.exp(-dt * 3f))
+
+        // Sky first, behind everything.
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
+        skyShader.bind()
+        skyShader.setUniformMatrix("u_invProjView", cam.invProjectionView)
+        skyShader.setUniformf("u_sunDir", SUN[0], SUN[1], SUN[2])
+        skyShader.setUniformf("u_fogColor", haze[0], haze[1], haze[2])
+        skyShader.setUniformf("u_skyTop", sky[0], sky[1], sky[2])
+        skyShader.setUniformf("u_time", time)
+        skyQuad.render(skyShader, GL20.GL_TRIANGLES)
+
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDepthFunc(GL20.GL_LEQUAL)
         Gdx.gl.glDisable(GL20.GL_BLEND)
         shader.bind()
         shader.setUniformMatrix("u_projView", cam.combined)
         shader.setUniformf("u_useModel", 0f)
-        shader.setUniformf("u_sunDir", -0.45f, 0.75f, 0.48f)
+        shader.setUniformf("u_sunDir", SUN[0], SUN[1], SUN[2])
         shader.setUniformf("u_camPos", cam.position)
         shader.setUniformf("u_fogColor", haze[0], haze[1], haze[2])
+        shader.setUniformf("u_skyTop", sky[0], sky[1], sky[2])
         shader.setUniformf("u_fogDensity", 1f / 2600f)
         shader.setUniformf("u_canopy", canopy[0], canopy[1], canopy[2])
         shader.setUniformf("u_canopyRange", 150f, 330f)
         shader.setUniformf("u_detail", 1f)
+        shader.setUniformf("u_time", time)
+        shader.setUniformf("u_light", 1f)
         chunks.render(shader, cam, originE, originN)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+        shader.setUniformf("u_light", bikeLight)
         bikeRenderer.render(shader, bike, originE, originN, baseH, world.ground.height(bike.x, bike.y))
+        shader.setUniformf("u_light", 1f)
         Gdx.gl.glDisable(GL20.GL_CULL_FACE)
+        chunks.renderWater(shader, cam, originE, originN)
+        wake.render(shader, originE, originN, baseH)
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
 
         // --- HUD ----------------------------------------------------------------------------
-        drawHud(dt)
+        if (!noHud) drawHud(dt)
         ui.endFrame()
     }
 
@@ -254,7 +294,13 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
 
     override fun dispose() {
         chunks.dispose(); shader.dispose(); bikeRenderer.dispose(); audio.dispose()
+        skyShader.dispose(); skyQuad.dispose(); wake.dispose()
     }
 
     private object Ui2 { val AUTO = Color(0.6f, 0.9f, 1f, 1f) }
+
+    private companion object {
+        /** Mid-morning sun from the south-east (render space: x east, y up, z south). */
+        val SUN = floatArrayOf(-0.45f, 0.75f, 0.48f)
+    }
 }

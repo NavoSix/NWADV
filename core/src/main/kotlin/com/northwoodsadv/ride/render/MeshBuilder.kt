@@ -83,6 +83,33 @@ class MeshBuilder(initialVerts: Int = 1024) {
         }
     }
 
+    /**
+     * Rounder, lumpy crown: two rings of [sides] vertices between a top and bottom point, each
+     * vertex pushed in or out a little (seeded by [seed]), lighter on top where the sun hits.
+     */
+    fun crown(x: Float, y: Float, z: Float, rx: Float, ry: Float, rz: Float, color: Float, top: Float, seed: Float, sides: Int = 7) {
+        fun lump(i: Int, j: Int) = 0.82f + 0.36f * (((sin(seed * 12.9898f + i * 78.233f + j * 37.719f) * 43758.547f) % 1f + 1f) % 1f)
+        val rings = arrayOf(0.42f, -0.38f)
+        val radius = arrayOf(0.88f, 0.92f)
+        val pts = Array(2) { j ->
+            Array(sides) { i ->
+                val a = seed + (i + 0.5f * j) * TWO_PI / sides
+                val k = lump(i, j) * radius[j]
+                floatArrayOf(x + cos(a) * rx * k, y + ry * rings[j] * lump(i + 7, j), z + sin(a) * rz * k)
+            }
+        }
+        val tx = x; val ty = y + ry * lump(0, 5); val tz = z
+        val bx = x; val by = y - ry * 0.75f; val bz = z
+        for (i in 0 until sides) {
+            val i1 = (i + 1) % sides
+            val a = pts[0][i]; val b = pts[0][i1]; val c = pts[1][i]; val d = pts[1][i1]
+            flatTri(a[0], a[1], a[2], tx, ty, tz, b[0], b[1], b[2], top)
+            flatTri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], color)
+            flatTri(b[0], b[1], b[2], d[0], d[1], d[2], c[0], c[1], c[2], color)
+            flatTri(c[0], c[1], c[2], d[0], d[1], d[2], bx, by, bz, color)
+        }
+    }
+
     /** Axis-aligned box centred at (x, y, z). */
     fun box(x: Float, y: Float, z: Float, hx: Float, hy: Float, hz: Float, color: Float) {
         val faces = arrayOf(
@@ -175,4 +202,24 @@ class MeshBuilder(initialVerts: Int = 1024) {
         fun color(rgb: Int, alpha: Float = 1f) = Color.toFloatBits((rgb shr 16) and 255, (rgb shr 8) and 255, rgb and 255, (alpha * 255).toInt())
         fun color(r: Float, g: Float, b: Float, a: Float = 1f) = Color.toFloatBits(r, g, b, a)
     }
+}
+
+/**
+ * Several [MeshBuilder]s for one batch of geometry that may outgrow 16-bit indices (dense
+ * forest chunks). [room] hands out the current builder, starting a new one when it is nearly
+ * full, or null once [maxParts] are full.
+ */
+class MeshSet(private val initialVerts: Int = 8192, private val maxParts: Int = 4) {
+    val parts = ArrayList<MeshBuilder>()
+
+    fun room(verts: Int = 1500): MeshBuilder? {
+        val c = parts.lastOrNull()
+        if (c != null && c.vertCount + verts <= LIMIT) return c
+        if (parts.size >= maxParts) return null
+        return MeshBuilder(initialVerts).also { parts += it }
+    }
+
+    val vertCount get() = parts.sumOf { it.vertCount }
+
+    companion object { const val LIMIT = 60_000 }
 }

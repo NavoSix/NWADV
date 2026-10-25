@@ -4,6 +4,7 @@ import com.northwoodsadv.ride.geo.Polyline
 import com.northwoodsadv.ride.osm.RoadKind
 import com.northwoodsadv.ride.osm.RoadSpec
 import com.northwoodsadv.ride.terrain.Elevation
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -13,11 +14,16 @@ import kotlin.math.floor
  * Real roads are graded: the profile is the DEM sampled along the centreline and smoothed over a
  * distance that depends on how engineered the road is (highways are smooth over ~60 m, Class VI
  * roads follow the land closely). Bridges span straight between their ends.
+ *
+ * Faster roads are banked (superelevated) through their bends, and every road has an earthwork
+ * cross-section: a cut bank where it was dug into the hillside, a fill slope where it was built
+ * up, with stretches blasted through ledge as near-vertical rock cuts.
  */
 class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elevation) {
     val seed = (id xor (id ushr 32)).toInt() * 31 + 7
     val halfWidth = spec.width / 2
     private val profile: FloatArray
+    private val bank: FloatArray
 
     init {
         val n = floor(line.length / STEP).toInt() + 2
@@ -34,7 +40,50 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
             smooth = DoubleArray(n) { a + (b - a) * it / (n - 1).coerceAtLeast(1) }
         }
         profile = FloatArray(n) { smooth[it].toFloat() }
+
+        // Superelevation: e = v^2 / (g R), shared with side friction (about 55% carried by the
+        // bank) and capped like a state DOT would. Smoothed so it runs in and out of the bend.
+        val v = designSpeed(spec)
+        bank = if (v <= 0 || spec.bridge || line.length < 30) FloatArray(1) else {
+            val p = DoubleArray(3)
+            val e = DoubleArray(n) { i ->
+                val s = i * STEP
+                line.pointAt(s - 6, p); val h0 = p[2]; line.pointAt(s + 6, p)
+                var dh = p[2] - h0
+                while (dh > PI) dh -= 2 * PI; while (dh < -PI) dh += 2 * PI
+                val k = dh / 12.0
+                (v * v * k / 9.81 * 0.55).coerceIn(-MAX_BANK, MAX_BANK)
+            }
+            val r = (24.0 / STEP / 2).toInt()
+            val sm = boxFilter(boxFilter(e, r), r)
+            FloatArray(n) { sm[it].toFloat() }
+        }
     }
+
+    /**
+     * Cross slope (rise per metre) toward the outside of the bend at s, signed like the
+     * curvature (positive in a left-hand bend, where the left edge is lower).
+     */
+    fun bankAt(s: Double): Double {
+        if (bank.size == 1) return 0.0
+        val f = (s / STEP).coerceIn(0.0, (bank.size - 1).toDouble())
+        val i = floor(f).toInt().coerceAtMost(bank.size - 2)
+        val t = f - i
+        return bank[i] * (1 - t) + bank[i + 1] * t
+    }
+
+    /** 0..1: how much of the cut face at s is blasted ledge rather than soil (maintained roads only). */
+    fun rockCut(s: Double): Double =
+        if (spec.isClassVI) 0.0 else Noise.smoothstep(0.66, 0.76, Noise.value1(s / 90, seed + 60))
+
+    /** Steepness (rise per metre) of the cut bank at s. */
+    fun cutSlope(s: Double): Double {
+        val soil = if (spec.isClassVI) 0.9 + 0.5 * Noise.value1(s / 40, seed + 61) else 1.3 + 0.4 * Noise.value1(s / 40, seed + 61)
+        return soil + (5.0 - soil) * rockCut(s)
+    }
+
+    /** Steepness of the fill slope built up on the downhill side. */
+    val fillSlope = if (spec.isClassVI) 0.6 else 0.75
 
     fun heightAt(s: Double): Double {
         val f = (s / STEP).coerceIn(0.0, (profile.size - 1).toDouble())
@@ -55,6 +104,14 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
 
     companion object {
         const val STEP = 4.0
+        /** Steepest bank on a public road (8%) and a little extra on old built-up curves. */
+        const val MAX_BANK = 0.08
+
+        /** Speed (m/s) a road's curves were built for, or 0 for unbanked roads. */
+        fun designSpeed(spec: RoadSpec) = when (spec.kind) {
+            RoadKind.HIGHWAY -> 25.0; RoadKind.MAJOR -> 22.0; RoadKind.MINOR -> 17.0; RoadKind.GRAVEL -> 13.0
+            else -> 0.0
+        }
 
         private fun boxFilter(a: DoubleArray, r: Int): DoubleArray {
             if (r < 1 || a.size < 3) return a

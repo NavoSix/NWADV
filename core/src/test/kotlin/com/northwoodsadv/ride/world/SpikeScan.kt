@@ -46,7 +46,7 @@ class SpikeScan {
             val mb = com.northwoodsadv.ride.render.MeshBuilder(64)
             cb.trailObstacles(d, mb)
             println("obstacle verts in chunk: ${mb.vertCount}")
-            println("chunk $cx,$cy trees verts=${d.trees?.vertCount} at e=%.0f n=%.0f".format(tmp[0], tmp[1]))
+            println("chunk $cx,$cy trees verts=${d.trees.vertCount} at e=%.0f n=%.0f".format(tmp[0], tmp[1]))
         }
         println("roads=${world.roads.size} classVI=${world.roads[0].spec.isClassVI} kind=${world.roads[0].spec.kind}")
         val gs2 = GroundSample()

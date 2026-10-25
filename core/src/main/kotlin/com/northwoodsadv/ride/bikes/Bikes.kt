@@ -90,7 +90,7 @@ object Bikes {
             dragArea = 0.58,
             groundClearanceLean = Math.toRadians(45.0),
         ),
-        sound = EngineSound.SINGLE,
+        sound = EngineSound.HIMALAYAN_411,
         look = { HimalayanLook(it) },
         engine = "411 cc single",
         power = "24 hp / 32 N m",

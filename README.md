@@ -87,9 +87,24 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
   - 207 kg with the accessories.
   - 21"/17" spoked wheels on knobbies, 200/180 mm travel, 26.5 deg rake.
-  - It sounds like a thumping single.
+  - The engine sound is the real bike: Donovan recorded it holding idle, 1,900, 2,850, 4,000
+    and 4,800 rpm. The game plays one recorded firing cycle per firing, blended between the two
+    recordings nearest the current rpm, with the single's natural cycle-to-cycle lope.
   - Ridden with a 90 kg rider, it does 0-100 km/h in about 15 s and tops out near 125 km/h.
 - **Mid-weight ADV twin**: the original generic 100 hp stand-in.
+
+### Recording a bike's engine
+
+Record the bike in neutral holding steady revs (idle, then roughly 2k, 3k, 4k and 5k) for about
+20 s each, phone close to the exhaust. Then build a grain bank:
+
+```
+cd tools/engine-samples
+python3 make_grains.py ../../assets/sounds/<bike>.grains <bike>/idle.mp3 <bike>/2k.mp3 ...
+```
+
+The tool measures each take's real rpm from its firing rate, so the labels don't need to be
+exact. Point the bike's `EngineSound` at the new asset (`grainAsset`).
 
 ## Difficulty
 

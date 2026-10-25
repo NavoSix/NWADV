@@ -42,7 +42,7 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     private val panel = MeshBuilder.color(0x2c2c2f)
     private val letters = MeshBuilder.color(0xc6c8ca)
     private val amber = MeshBuilder.color(0xe8890e)
-    private val tail = MeshBuilder.color(0xa80e10)
+    private val tail = MeshBuilder.color(0xb8141a, 0.55f)          // lit tail light
     private val plate = MeshBuilder.color(0xe4ece2)
     private val chain = MeshBuilder.color(0xb48c3c)
     private val chainDark = MeshBuilder.color(0x6a5428)
@@ -100,20 +100,36 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.loft(arrayOf(st(0.37f, 0.33f, 0.10f, 0.11f), st(0.33f, 0.33f, 0.15f, 0.135f), st(0.06f, 0.32f, 0.15f, 0.14f),
             st(-0.06f, 0.35f, 0.12f, 0.13f), st(-0.09f, 0.38f, 0.08f, 0.10f)), engine, ls, 0.65f)
         m.box(0.02f, 0.50f, 0f, 0.08f, 0.05f, 0.11f, engine)                                // gearbox hump
-        // Finned barrel, head and cam cover filling up to the tank.
-        m.box(0.235f, 0.59f, 0f, 0.075f, 0.14f, 0.08f, engine)
-        val fins = if (hi) 10 else 6
+        // Barrel and head finned all the way up to the tank: deep fins, wider than the
+        // barrel and closely stacked, as on the real air/oil-cooled 411.
+        m.box(0.235f, 0.60f, 0f, 0.07f, 0.15f, 0.075f, engine)
+        val fins = if (hi) 15 else 8
         for (k in 0 until fins) {
-            val y = 0.47f + k * 0.23f / (fins - 1)
-            m.box(0.215f + (y - 0.45f) * 0.25f, y, 0f, 0.105f, if (hi) 0.006f else 0.009f, 0.118f, if (k % 2 == 0) fin else engine)
+            val y = 0.465f + k * 0.29f / (fins - 1)
+            val head = y > 0.70f
+            val c = if (hi) fin else if (k % 2 == 0) fin else engine
+            m.box(0.215f + (y - 0.45f) * 0.25f, y, 0f, if (head) 0.10f else 0.112f, if (hi) 0.0055f else 0.009f, if (head) 0.118f else 0.128f, c)
         }
-        m.box(0.275f, 0.735f, 0f, 0.10f, 0.035f, 0.11f, fin)                                 // head
-        m.box(0.27f, 0.778f, 0f, 0.07f, 0.02f, 0.08f, engine)                               // cam cover
-        // Cases: RE logo on the left, clutch cover on the right, both round.
-        m.discZ(0.12f, 0.31f, -0.14f, -0.152f, 0.075f, silver)
-        m.discZ(0.12f, 0.31f, -0.152f, -0.156f, 0.052f, engine)
-        m.discZ(0.17f, 0.30f, 0.14f, 0.154f, 0.08f, engine)
-        m.discZ(0.0f, 0.36f, -0.135f, -0.146f, 0.05f, engine)                                // sprocket cover
+        m.box(0.29f, 0.77f, 0f, 0.075f, 0.018f, 0.085f, engine)                             // cam cover
+        // Left: big generator cover with the winged-R logo (silver disc, black ring, silver R).
+        m.discZ(0.12f, 0.31f, -0.14f, -0.156f, 0.115f, engine)
+        m.discZ(0.12f, 0.31f, -0.156f, -0.160f, 0.062f, silver)
+        m.discZ(0.12f, 0.31f, -0.160f, -0.162f, 0.054f, MeshBuilder.color(0x141414))
+        m.discZ(0.12f, 0.31f, -0.162f, -0.164f, 0.046f, MeshBuilder.color(0x8e9296))
+        if (hi) {
+            // The "R" and its wings, raised in silver.
+            m.box(0.104f, 0.31f, -0.166f, 0.006f, 0.026f, 0.002f, chrome)
+            m.box(0.122f, 0.326f, -0.166f, 0.016f, 0.006f, 0.002f, chrome)
+            m.box(0.122f, 0.31f, -0.166f, 0.016f, 0.005f, 0.002f, chrome)
+            m.beam(0.118f, 0.31f, -0.166f, 0.136f, 0.284f, -0.166f, 0.003f, chrome)
+            for (w in listOf(-1f, 1f)) for (k in 0 until 3) m.box(0.12f + w * (0.034f + k * 0.008f), 0.322f - k * 0.008f, -0.166f, 0.006f, 0.0025f, 0.002f, chrome)
+        }
+        // Right: clutch cover, oil filler cap, and the sprocket cover / pivot badge on the left.
+        m.discZ(0.15f, 0.31f, 0.14f, 0.156f, 0.10f, engine)
+        m.discZ(0.20f, 0.42f, 0.13f, 0.152f, 0.022f, MeshBuilder.color(0x1a1a1a))
+        m.discZ(0.0f, 0.36f, -0.135f, -0.148f, 0.055f, engine)                                // sprocket cover
+        m.discZ(-0.06f, 0.39f, -0.118f, -0.128f, 0.036f, MeshBuilder.color(0x141414))         // pivot cover
+        m.discZ(-0.06f, 0.39f, -0.128f, -0.131f, 0.028f, MeshBuilder.color(0x1c3ca8))          // blue Royal Enfield badge
         // Intake, airbox and battery under the seat.
         m.rod(0.16f, 0.66f, 0f, 0.02f, 0.68f, 0f, 0.032f, 0.032f, MeshBuilder.color(0x3a3a3a))
         m.box(-0.13f, 0.60f, 0f, 0.12f, 0.13f, 0.11f, engine)
@@ -121,9 +137,12 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         // Electrics and the frame space under the tank.
         m.loft(arrayOf(st(0.42f, 0.80f, 0.03f, 0.07f), st(0.30f, 0.79f, 0.04f, 0.11f), st(0.05f, 0.79f, 0.04f, 0.11f)), frame, 8, 0.8f)
         m.box(0.12f, 0.745f, 0.06f, 0.05f, 0.025f, 0.03f, MeshBuilder.color(0x2a2a2a))     // coil
-        // Oil cooler ahead of the barrel, round horn on the right.
-        m.box(0.395f, 0.60f, 0f, 0.016f, 0.07f, 0.10f, MeshBuilder.color(0x2c2c2c))
+        // Tall oil cooler standing ahead of the barrel (left of centre), round horn on the right.
+        m.box(0.40f, 0.60f, -0.05f, 0.012f, 0.105f, 0.065f, MeshBuilder.color(0x222222))
         m.discZ(0.40f, 0.56f, 0.125f, 0.15f, 0.045f, MeshBuilder.color(0x2a2a2a), silver)
+        // Rear brake reservoir (white with a black cap) on the right behind the engine.
+        m.rod(-0.02f, 0.45f, 0.13f, -0.02f, 0.50f, 0.13f, 0.018f, 0.018f, MeshBuilder.color(0xe8e8e4))
+        m.rod(-0.02f, 0.50f, 0.13f, -0.02f, 0.52f, 0.13f, 0.02f, 0.02f, MeshBuilder.color(0x161616))
         // Rear monoshock (behind the airbox, visible through the frame).
         m.rod(-0.10f, 0.36f, 0f, -0.24f, 0.70f, 0f, 0.026f, 0.026f, MeshBuilder.color(0x303030))
         if (hi) for (k in 0..9) {
@@ -137,8 +156,12 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.loft(arrayOf(st(0.30f, 0.87f, 0.115f, 0.185f), st(0.284f, 0.87f, 0.115f, 0.185f)), MeshBuilder.color(0x86888c), ls, 0.55f)
         m.loft(arrayOf(st(0.285f, 0.87f, 0.11f, 0.181f), st(0.18f, 0.875f, 0.105f, 0.17f), st(0.08f, 0.875f, 0.09f, 0.15f), st(0.02f, 0.87f, 0.06f, 0.12f)), gloss, ls, 0.55f)
         for (s in listOf(-1f, 1f)) {
-            m.discZ(0.40f, 0.89f, s * 0.176f, s * 0.186f, 0.038f, MeshBuilder.color(0xe6e6e2))   // badge
-            if (hi) m.discZ(0.40f, 0.89f, s * 0.186f, s * 0.188f, 0.026f, MeshBuilder.color(0x7a1010))
+            // Holographic North East Adventure Rally sticker.
+            m.discZ(0.40f, 0.89f, s * 0.176f, s * 0.186f, 0.042f, MeshBuilder.color(0xc8c6d8))
+            if (hi) {
+                m.discZ(0.40f, 0.89f, s * 0.186f, s * 0.187f, 0.031f, MeshBuilder.color(0x9a9ab4))
+                m.discZ(0.40f, 0.89f, s * 0.187f, s * 0.188f, 0.024f, MeshBuilder.color(0xd8d0e4))
+            }
         }
         m.cone(0.24f, 0.975f, 0f, 0.048f, 0.044f, 0.012f, ls, MeshBuilder.color(0x2a2a2a)) // fuel cap
         if (hi) for (k in 0 until 6) {
@@ -176,16 +199,33 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
 
         // --- crash bars, skid plate, tank guards, controls ----------------------------------
         for (s in listOf(-1f, 1f)) {
-            m.bent(arrayOf(floatArrayOf(0.40f, 0.68f, 0.09f), floatArrayOf(0.44f, 0.50f, 0.24f), floatArrayOf(0.40f, 0.26f, 0.23f),
-                floatArrayOf(0.12f, 0.22f, 0.22f), floatArrayOf(-0.01f, 0.40f, 0.17f), floatArrayOf(-0.05f, 0.52f, 0.10f)), s, 0.013f, frame)
-            m.beam(0.43f, 0.46f, s * 0.235f, 0.10f, 0.44f, s * 0.215f, 0.012f, frame)
-            m.bent(arrayOf(floatArrayOf(headX + 0.01f, headY - 0.03f, 0.08f), floatArrayOf(0.47f, 0.90f, 0.21f), floatArrayOf(0.46f, 0.64f, 0.225f),
-                floatArrayOf(0.30f, 0.60f, 0.20f), floatArrayOf(0.27f, 0.74f, 0.12f)), s, 0.012f, frame)
-            m.beam(0.46f, 0.78f, s * 0.22f, 0.29f, 0.70f, s * 0.20f, 0.011f, frame)
-            m.box(0.40f, 0.80f, s * 0.22f, 0.075f, 0.026f, 0.004f, frame)                 // Royal Enfield plate
-            m.box(0.40f, 0.80f, s * 0.225f, 0.06f, 0.008f, 0.002f, letters)
-            m.beam(0.47f, 0.90f, s * 0.21f, 0.50f, 0.90f, s * 0.25f, 0.008f, frame)         // front signals
-            m.blob(0.52f, 0.90f, s * 0.26f, 0.032f, 0.026f, 0.026f, amber)
+            // Modern Tech crash bars: a cage from the frame out around the front of the engine,
+            // with a mid bar, a diagonal across the cases and a slider stub.
+            val ct = 0.013f
+            m.bent(arrayOf(floatArrayOf(0.33f, 0.66f, 0.10f), floatArrayOf(0.42f, 0.64f, 0.20f), floatArrayOf(0.46f, 0.58f, 0.245f),
+                floatArrayOf(0.47f, 0.34f, 0.245f), floatArrayOf(0.42f, 0.24f, 0.235f), floatArrayOf(0.20f, 0.22f, 0.22f),
+                floatArrayOf(0.02f, 0.26f, 0.16f), floatArrayOf(-0.03f, 0.28f, 0.10f)), s, ct, frame)
+            m.bent(arrayOf(floatArrayOf(0.46f, 0.58f, 0.245f), floatArrayOf(0.20f, 0.58f, 0.225f), floatArrayOf(0.05f, 0.52f, 0.16f), floatArrayOf(-0.03f, 0.54f, 0.10f)), s, ct, frame)
+            m.bent(arrayOf(floatArrayOf(0.20f, 0.58f, 0.225f), floatArrayOf(0.08f, 0.27f, 0.20f)), s, ct, frame)
+            m.bent(arrayOf(floatArrayOf(0.47f, 0.42f, 0.245f), floatArrayOf(0.25f, 0.42f, 0.232f), floatArrayOf(0.15f, 0.44f, 0.215f)), s, ct, frame)
+            m.rod(0.40f, 0.48f, s * 0.24f, 0.40f, 0.48f, s * 0.29f, 0.017f, 0.017f, frame, MeshBuilder.color(0x0c0c0c))
+            // Tank guards: a rounded tube loop beside the front of the tank, the embossed
+            // Royal Enfield plate bridging it, braced to the frame.
+            m.bent(arrayOf(floatArrayOf(headX + 0.01f, headY - 0.03f, 0.07f), floatArrayOf(0.46f, 0.935f, 0.17f), floatArrayOf(0.50f, 0.93f, 0.205f),
+                floatArrayOf(0.515f, 0.88f, 0.21f), floatArrayOf(0.505f, 0.70f, 0.21f), floatArrayOf(0.48f, 0.65f, 0.205f),
+                floatArrayOf(0.36f, 0.64f, 0.20f), floatArrayOf(0.32f, 0.67f, 0.195f), floatArrayOf(0.31f, 0.86f, 0.19f),
+                floatArrayOf(0.34f, 0.92f, 0.18f), floatArrayOf(0.46f, 0.935f, 0.17f)), s, 0.012f, frame)
+            m.beam(0.36f, 0.64f, s * 0.20f, 0.30f, 0.66f, s * 0.11f, 0.011f, frame)
+            m.box(0.41f, 0.79f, s * 0.205f, 0.097f, 0.03f, 0.005f, frame)                 // Royal Enfield plate
+            if (hi) {
+                // Embossed letters and the two slots either end.
+                for (k in 0 until 12) m.box(0.355f + k * 0.0105f, 0.79f, s * 0.211f, 0.0035f, 0.012f, 0.0015f, MeshBuilder.color(0x2e2e2e))
+                for (e in listOf(0.325f, 0.495f)) m.box(e, 0.79f, s * 0.211f, 0.004f, 0.018f, 0.0015f, MeshBuilder.color(0x070707))
+            } else m.box(0.41f, 0.79f, s * 0.211f, 0.065f, 0.011f, 0.0015f, MeshBuilder.color(0x2e2e2e))
+            // Turn signals: black ball housings with amber lenses, off the headlight frame.
+            m.beam(0.55f, 0.93f, s * 0.10f, 0.55f, 0.93f, s * 0.205f, 0.009f, frame)
+            m.blob(0.56f, 0.93f, s * 0.235f, 0.036f, 0.034f, 0.034f, MeshBuilder.color(0x161616))
+            m.rod(0.585f, 0.93f, s * 0.24f, 0.594f, 0.93f, s * 0.245f, 0.022f, 0.02f, amber)
             // Wide pegs on brackets.
             m.box(rider.pegX, rider.pegY - 0.02f, s * 0.17f, 0.05f, 0.012f, 0.05f, MeshBuilder.color(0x3a3a3a))
             m.beam(rider.pegX - 0.06f, rider.pegY + 0.02f, s * 0.11f, rider.pegX, rider.pegY - 0.02f, s * 0.13f, 0.014f, frame)
@@ -206,31 +246,67 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             // Bolts on the cases.
             for (k in 0 until 8) {
                 val a = k * MeshBuilder.TWO_PI / 8
-                m.discZ(0.12f + cos(a) * 0.066f, 0.31f + sin(a) * 0.066f, -0.152f, -0.157f, 0.006f, bolt)
-                m.discZ(0.17f + cos(a) * 0.072f, 0.30f + sin(a) * 0.072f, 0.154f, 0.159f, 0.006f, bolt)
+                m.discZ(0.12f + cos(a) * 0.098f, 0.31f + sin(a) * 0.098f, -0.156f, -0.161f, 0.006f, bolt)
+                m.discZ(0.15f + cos(a) * 0.088f, 0.31f + sin(a) * 0.088f, 0.156f, 0.161f, 0.006f, bolt)
             }
             // Oil cooler fins and hoses.
-            for (k in 0 until 6) m.box(0.41f, 0.545f + k * 0.022f, 0f, 0.002f, 0.003f, 0.095f, MeshBuilder.color(0x4a4a4a))
-            for (s in listOf(-1f, 1f)) m.bent(arrayOf(floatArrayOf(0.39f, 0.53f, 0.08f), floatArrayOf(0.36f, 0.45f, 0.11f), floatArrayOf(0.30f, 0.42f, 0.12f)), s, 0.008f, rubber)
+            for (k in 0 until 9) m.box(0.413f, 0.505f + k * 0.023f, -0.05f, 0.002f, 0.003f, 0.06f, MeshBuilder.color(0x3c3c3c))
+            for (s in listOf(-1f, 1f)) m.bent(arrayOf(floatArrayOf(0.39f, 0.50f, 0.05f), floatArrayOf(0.36f, 0.44f, 0.10f), floatArrayOf(0.30f, 0.42f, 0.12f)), s, 0.008f, rubber)
+            // Clutch actuating arm (silver) and its cable on the right case.
+            m.beam(0.06f, 0.45f, 0.152f, 0.02f, 0.48f, 0.156f, 0.006f, chrome)
+            m.rod(0.02f, 0.48f, 0.156f, 0.02f, 0.49f, 0.156f, 0.008f, 0.008f, chrome)
+            m.bent(arrayOf(floatArrayOf(0.06f, 0.45f, 0.152f), floatArrayOf(0.14f, 0.50f, 0.15f), floatArrayOf(0.22f, 0.52f, 0.15f)), 1f, 0.004f, cable)
+            // Peg studs.
+            for (s in listOf(-1f, 1f)) for (k in 0 until 4) m.cone(rider.pegX - 0.035f + k * 0.023f, rider.pegY - 0.008f, s * 0.17f, 0.004f, 0.002f, 0.008f, 5, bolt)
             m.cone(0.30f, 0.79f, 0.03f, 0.008f, 0.006f, 0.04f, 6, MeshBuilder.color(0x5a5a5a))  // spark plug cap
         }
 
         // --- headlight, cowl, instruments (frame-mounted on the Himalayan) ------------------
         m.rod(0.56f, 0.96f, 0f, 0.62f, 0.96f, 0f, 0.088f, 0.09f, gloss)                     // bucket
-        m.tube(0.62f, 0.96f, 0f, 0.632f, 0.96f, 0f, 0.094f, 0.094f, ls, chrome, chrome)      // bezel
-        m.tube(0.632f, 0.96f, 0f, 0.637f, 0.96f, 0f, 0.08f, 0.08f, ls, lens, lens)           // lens
-        if (hi) m.tube(0.637f, 0.96f, 0f, 0.64f, 0.96f, 0f, 0.022f, 0.022f, 10, MeshBuilder.color(0xfffbe8), MeshBuilder.color(0xfffbe8))
-        m.loft(arrayOf(st(0.50f, 1.04f, 0.12f, 0.16f), st(0.58f, 1.05f, 0.10f, 0.15f), st(0.64f, 1.06f, 0.06f, 0.12f)), cowl, ls, 0.5f)
-        m.box(0.52f, 1.04f, 0f, 0.03f, 0.05f, 0.10f, gloss)                                 // instrument pod
-        m.tube(0.505f, 1.06f, -0.035f, 0.495f, 1.06f, -0.035f, 0.05f, 0.05f, ls, gloss, gauge)   // speedo
-        m.tube(0.505f, 1.07f, 0.055f, 0.495f, 1.07f, 0.055f, 0.03f, 0.03f, ls, gloss, gauge)     // tacho
-        m.box(0.51f, 1.16f, 0f, 0.006f, 0.05f, 0.085f, MeshBuilder.color(0x0c0e12))         // phone
-        m.beam(0.52f, 1.09f, 0f, 0.51f, 1.12f, 0f, 0.01f, gloss)
+        m.tube(0.618f, 0.96f, 0f, 0.634f, 0.96f, 0f, 0.097f, 0.095f, ls, MeshBuilder.color(0x161616), MeshBuilder.color(0x161616))  // black bezel
+        m.tube(0.630f, 0.96f, 0f, 0.641f, 0.96f, 0f, 0.085f, 0.085f, ls, MeshBuilder.color(0xc8d0d4), MeshBuilder.color(0xf2f4f0, 0.35f))  // glass lens (lamp on) over the chrome reflector
         if (hi) {
-            m.beam(0.494f, 1.06f, -0.035f, 0.494f, 1.09f, -0.055f, 0.003f, MeshBuilder.color(0xd02020))   // needles
-            m.beam(0.494f, 1.07f, 0.055f, 0.494f, 1.085f, 0.07f, 0.002f, MeshBuilder.color(0xd02020))
-            m.box(0.504f, 1.16f, 0f, 0.001f, 0.044f, 0.078f, MeshBuilder.color(0x1a2a3e))     // phone screen
-            for (s in listOf(-1f, 1f)) m.cone(0.62f, 1.07f, s * 0.11f, 0.006f, 0.006f, 0.006f, 6, bolt)   // cowl screws
+            m.tube(0.641f, 0.96f, 0f, 0.643f, 0.96f, 0f, 0.06f, 0.06f, ls, MeshBuilder.color(0xffffff, 0.2f), MeshBuilder.color(0xffffff, 0.2f))  // reflector
+            m.tube(0.643f, 0.955f, 0f, 0.646f, 0.955f, 0f, 0.016f, 0.016f, 10, MeshBuilder.color(0xfffbe8, 0f), MeshBuilder.color(0xfffbe8, 0f))
+            for (a in listOf(0.6f, 2.5f, 4.4f)) m.cone(0.64f, 0.96f + sin(a) * 0.09f, cos(a) * 0.09f, 0.005f, 0.005f, 0.004f, 6, bolt)
+        }
+        m.loft(arrayOf(st(0.50f, 1.04f, 0.12f, 0.16f), st(0.58f, 1.05f, 0.10f, 0.15f), st(0.64f, 1.06f, 0.06f, 0.12f)), cowl, ls, 0.5f)
+        // Headlight frame: black tubes from the steering head, with the Tusk-stickered plates.
+        for (s in listOf(-1f, 1f)) {
+            m.bent(arrayOf(floatArrayOf(headX + 0.04f, headY - 0.05f, 0.06f), floatArrayOf(0.55f, 0.88f, 0.10f), floatArrayOf(0.555f, 1.06f, 0.11f),
+                floatArrayOf(0.47f, 1.05f, 0.08f)), s, 0.011f, frame)
+            m.box(0.545f, 0.925f, s * 0.118f, 0.022f, 0.05f, 0.004f, frame)
+            m.box(0.545f, 0.92f, s * 0.123f, 0.014f, 0.022f, 0.0015f, tusk)
+        }
+
+        // Instruments, as seen from the saddle: big round speedo (chrome ring, black face,
+        // LCD), small tacho above right, fuel/temperature lozenge below it, warning lights.
+        m.box(0.515f, 1.05f, 0.01f, 0.015f, 0.065f, 0.105f, gloss)                           // cluster housing
+        m.tube(0.506f, 1.05f, -0.03f, 0.498f, 1.05f, -0.03f, 0.06f, 0.06f, ls, chrome, chrome)
+        m.tube(0.499f, 1.05f, -0.03f, 0.495f, 1.05f, -0.03f, 0.054f, 0.054f, ls, gloss, gloss)
+        m.box(0.494f, 1.034f, -0.03f, 0.001f, 0.012f, 0.027f, MeshBuilder.color(0xc8d2b0))  // LCD
+        m.tube(0.506f, 1.088f, 0.058f, 0.498f, 1.088f, 0.058f, 0.031f, 0.031f, ls, chrome, chrome)
+        m.tube(0.499f, 1.088f, 0.058f, 0.495f, 1.088f, 0.058f, 0.027f, 0.027f, ls, gloss, gloss)
+        m.box(0.499f, 1.025f, 0.058f, 0.004f, 0.02f, 0.036f, chrome)                          // fuel / temp lozenge
+        m.box(0.496f, 1.025f, 0.058f, 0.002f, 0.016f, 0.031f, gloss)
+        // Crossbar mount above the gauges, round Quad Lock mount, phone in landscape.
+        m.rod(0.505f, 1.135f, -0.10f, 0.505f, 1.135f, 0.10f, 0.011f, 0.011f, gloss)
+        m.tube(0.505f, 1.16f, 0.055f, 0.495f, 1.16f, 0.055f, 0.032f, 0.032f, ls, gloss, MeshBuilder.color(0x1e1e1e))
+        m.box(0.488f, 1.215f, 0f, 0.006f, 0.046f, 0.083f, MeshBuilder.color(0x0c0e12))     // phone
+        if (hi) {
+            m.beam(0.494f, 1.05f, -0.03f, 0.494f, 1.052f, -0.075f, 0.003f, MeshBuilder.color(0xe03020))   // speedo needle (at rest)
+            m.beam(0.494f, 1.088f, 0.058f, 0.494f, 1.068f, 0.05f, 0.002f, MeshBuilder.color(0xe03020))    // tacho needle
+            for (k in 0..10) {                                                                              // speedo ticks
+                val a = 3.6f - k * 0.38f
+                m.box(0.494f, 1.05f + sin(a) * 0.046f, -0.03f + cos(a) * 0.046f, 0.001f, 0.003f, 0.003f, MeshBuilder.color(0xe8e8e8))
+            }
+            for (r in 0 until 4) for (c in 0 until 2)                                                       // warning lights
+                m.box(0.496f, 1.075f - r * 0.013f, 0.012f + c * 0.013f, 0.002f, 0.0045f, 0.0045f, MeshBuilder.color(0x1c1c1c))
+            m.box(0.494f, 1.022f, 0.072f, 0.001f, 0.008f, 0.009f, MeshBuilder.color(0xb8c8a0))             // fuel LCD
+            m.tube(0.495f, 1.16f, 0.055f, 0.492f, 1.16f, 0.055f, 0.012f, 0.012f, 10, silver, silver)        // mount centre
+            m.box(0.481f, 1.215f, 0f, 0.001f, 0.04f, 0.076f, MeshBuilder.color(0x1a2a3e))                   // phone screen
+            for (s in listOf(-1f, 1f)) m.cone(0.62f, 1.07f, s * 0.11f, 0.006f, 0.006f, 0.006f, 6, bolt)    // cowl screws
+            m.box(0.595f, 1.14f, -0.07f, 0.002f, 0.024f, 0.026f, MeshBuilder.color(0x38b8ac))               // Northwoods ADV sticker
         }
 
         // --- rear: pannier frames, rack, tail, plate ------------------------------------------
@@ -305,9 +381,13 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             m.cone(0f, 0.032f, 0f, 0.022f, 0.022f, 0.012f, 10, chrome)                         // stem nut
             for (s in listOf(-1f, 1f)) m.cone(0f, 0.032f, s * 0.09f, 0.014f, 0.014f, 0.008f, 8, bolt)
         }
-        // High "beak" fender off the lower clamp.
-        m.loft(arrayOf(floatArrayOf(lc[0] - 0.05f, lc[1] - 0.04f, 0.012f, 0.07f), floatArrayOf(lc[0] + 0.12f, lc[1] - 0.05f, 0.012f, 0.08f),
-            floatArrayOf(lc[0] + 0.30f, lc[1] - 0.09f, 0.01f, 0.065f)), gloss, 8, 0.8f)
+        // Upper fender: glossy black, curving over the wheel from the lower clamp (it steers
+        // with the fork but doesn't move with the suspension).
+        val fr = spec.frontRadius.toFloat() + 0.15f
+        m.arc(ax, ay, fr, 1.22f, 1.92f, 0.07f, 0.008f, gloss, if (hi) 12 else 6)
+        m.arc(ax, ay, fr - 0.012f, 1.27f, 1.88f, 0.05f, 0.012f, gloss, if (hi) 8 else 4)          // stiffening rib
+        m.beam(lc[0], lc[1] - 0.02f, -0.05f, lc[0] + 0.02f, lc[1] - 0.06f, 0f, 0.012f, frame)  // mount
+        m.beam(lc[0], lc[1] - 0.02f, 0.05f, lc[0] + 0.02f, lc[1] - 0.06f, 0f, 0.012f, frame)
         // Bars on risers, with the chrome crossbar brace.
         for (s in listOf(-1f, 1f)) m.beam(-0.02f, 0.02f, s * 0.05f, -0.04f, 0.11f, s * 0.05f, 0.016f, frame)
         val by = 0.12f; val bx = rider.handX - headX
@@ -341,7 +421,7 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         val rf = spec.frontRadius.toFloat()
         for (s in listOf(-1f, 1f)) m.rod(0f, 0f, s * 0.09f, ux * 0.31f, uy * 0.31f, s * 0.09f, 0.026f, 0.026f, frame)  // lowers
         m.beam(0f, 0f, -0.11f, 0f, 0f, 0.11f, 0.012f, silver)                                // axle
-        m.box(-0.10f, 0.10f, -0.105f, 0.03f, 0.045f, 0.018f, MeshBuilder.color(0x2a2a2a))  // caliper (disc on the left)
+        m.box(-0.10f, 0.10f, -0.105f, 0.032f, 0.048f, 0.02f, MeshBuilder.color(0xb09a6a))  // gold Bybre caliper (disc on the left)
         // Low fender hugging the tyre.
         m.arc(0f, 0f, rf + 0.035f, 0.95f, 2.05f, 0.06f, 0.008f, gloss, if (hi) 12 else 6)
         m.tube(-0.02f, rf + 0.04f, -0.09f, -0.02f, rf + 0.04f, 0.09f, 0.008f, 0.008f, 6, frame, frame)  // fender brace

@@ -83,8 +83,15 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         cam.viewportWidth = pw; cam.viewportHeight = ph
         val camDist = 3.3f * maxOf(1f, ph / pw * 1.2f)
-        cam.position.set(cos(0.35f) * camDist, 1.3f, sin(0.35f) * camDist)
-        cam.lookAt(0f, 0.68f, 0f)
+        // Development: "distance,height,lookX,lookY" for close-up stills.
+        val dev = System.getProperty("nwadv.garageCam")?.split(",")?.mapNotNull { it.toFloatOrNull() }
+        if (dev != null && dev.size == 4) {
+            cam.position.set(cos(0.35f) * dev[0] + dev[2], dev[1], sin(0.35f) * dev[0])
+            cam.lookAt(dev[2], dev[3], 0f)
+        } else {
+            cam.position.set(cos(0.35f) * camDist, 1.3f, sin(0.35f) * camDist)
+            cam.lookAt(0f, 0.68f, 0f)
+        }
         cam.up.set(0f, 1f, 0f)
         cam.near = 0.1f; cam.far = 50f
         cam.update()

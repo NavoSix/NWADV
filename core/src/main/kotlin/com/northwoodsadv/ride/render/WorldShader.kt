@@ -11,7 +11,8 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram
  * - 0 ground: the colour alpha channel marks forest floor, which fades to canopy green with
  *   distance (beyond the range where individual trees are drawn). Steep faces (road cuts, gully
  *   sides) show bare soil and rock.
- * - 1 objects (trees, logs, the bike); u_light dims them in shade.
+ * - 1 objects (trees, logs, the bike); u_light dims them in shade. Colour alpha below 1 marks
+ *   self-lit parts such as lamps.
  * - 2 water: animated ripples, Fresnel sky reflection and sun glints, blended over the bed.
  * - 3 effects (wake, spray): vertex alpha.
  */
@@ -121,6 +122,8 @@ void main() {
         vec3 amb = mix(vec3(0.24, 0.21, 0.17), vec3(0.40, 0.47, 0.60), sky) * (0.55 + 0.45 * u_light);
         lit = base * (sunCol * sun * 1.0 + amb * 0.62);
         if (u_mode > 2.5) alpha = v_color.a;
+        // Objects: colour alpha below 1 marks self-lit parts (lamps), glowing at any sun angle.
+        else if (u_mode > 0.5) lit = mix(lit, base * 1.1, 1.0 - v_color.a);
     }
     // Gentle filmic shoulder and a touch more saturation.
     lit = lit * 1.12 / (1.0 + lit * 0.12);

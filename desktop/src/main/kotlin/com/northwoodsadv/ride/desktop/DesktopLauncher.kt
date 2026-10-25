@@ -64,6 +64,7 @@ fun main(args: Array<String>) {
             "--bike" -> System.setProperty("nwadv.bike", args[++i])
             "--garage" -> System.setProperty("nwadv.garage", "1")
             "--garage-angle" -> System.setProperty("nwadv.garageAngle", args[++i])
+            "--garage-cam" -> System.setProperty("nwadv.garageCam", args[++i])
             else -> gpx = File(args[i]).absolutePath
         }
         i++

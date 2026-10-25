@@ -25,6 +25,7 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
     private val tmp2 = DoubleArray(2)
     private val gs = GroundSample()
     var targetSpeed = 0.0; private set
+    private var throttleTrim = 0.0
 
     fun drive(bike: Motorcycle, assists: Assists, input: RiderInput) {
         route.project(bike.x, bike.y, along - 50, along + 150, tmp2)
@@ -67,7 +68,10 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
         }
         targetSpeed = max(v, 2.5)
         val err = targetSpeed - u
-        input.throttle = (0.2 + err * 0.25).coerceIn(0.0, 1.0)
+        // Proportional plus a slow integral trim (per call, ~60 Hz), so a small single holds
+        // speed on a climb as well as a big twin does.
+        throttleTrim = (throttleTrim + err * 0.004).coerceIn(-0.2, 0.6)
+        input.throttle = (0.2 + throttleTrim + err * 0.25).coerceIn(0.0, 1.0)
         input.frontBrake = if (err < -1.5) ((-err - 1.5) * 0.12).coerceIn(0.0, 0.7) else 0.0
         input.rearBrake = input.frontBrake * 0.5
         val rough = ground.roads.getOrNull(bike.sampleF.road)?.spec?.isClassVI == true || !bike.sampleF.onRoad

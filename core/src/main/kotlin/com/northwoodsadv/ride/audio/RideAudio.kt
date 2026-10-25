@@ -11,11 +11,34 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
+ * How an engine sounds: where in the 720-degree four-stroke cycle its cylinders fire, and the
+ * muffler that shapes each exhaust pulse.
+ */
+class EngineSound(
+    /** Firing angles (degrees of the 720-degree cycle). */
+    val firingDeg: DoubleArray,
+    /** Muffler resonance: base frequency (Hz) and how far it rises per Hz of crank speed. */
+    val boomHz: Double,
+    val boomPerRev: Double,
+    /** Size of each exhaust pulse. */
+    val pulse: Double,
+    /** How long a pulse rings (s) at closed and open throttle. */
+    val ringClosed: Double,
+    val ringOpen: Double,
+) {
+    companion object {
+        /** 270-degree crank parallel twin: the uneven lope of most mid-weight ADV twins. */
+        val TWIN_270 = EngineSound(doubleArrayOf(0.0, 270.0), 90.0, 0.9, 1.0, 0.0075, 0.0035)
+        /** Big air-cooled single: one deep thump every other revolution. */
+        val SINGLE = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005)
+    }
+}
+
+/**
  * Synthesised ride sound on its own thread: no samples to ship, and it follows the physics.
  *
- * - Engine: a 270-degree parallel twin fires at 0 and 270 degrees of a 720-degree cycle, giving
- *   the uneven "V-twin" lope of most mid-weight ADV bikes. Each firing is an exhaust pulse through
- *   a resonant muffler; load (throttle) adds bark, the overrun pops a little.
+ * - Engine: each cylinder firing ([EngineSound]) is an exhaust pulse through a resonant muffler;
+ *   load (throttle) adds bark, the overrun pops a little.
  * - Wind rises with speed squared; tyre scrub rises when the tyres slide.
  * - Tyres on the ground: a soft, low-passed roll that changes with the surface ([SurfaceSound]),
  *   plus filtered "grains" (gravel crunch, rock knocks, splashes). Nothing is full-bandwidth, so
@@ -27,6 +50,7 @@ class RideAudio : Disposable {
     @Volatile var speed = 0f
     @Volatile var slip = 0f
     @Volatile var surface = SurfaceSound.PAVED
+    @Volatile var engine = EngineSound.TWIN_270
     @Volatile var volume = 0.8f
     @Volatile var muted = false
 
@@ -46,7 +70,7 @@ class RideAudio : Disposable {
         val dev = device ?: return
         while (running) {
             synth.rpm = rpm.toDouble(); synth.throttle = throttle.toDouble(); synth.speed = speed.toDouble()
-            synth.slip = slip.toDouble(); synth.surface = surface; synth.volume = if (muted) 0.0 else volume.toDouble()
+            synth.slip = slip.toDouble(); synth.surface = surface; synth.engine = engine; synth.volume = if (muted) 0.0 else volume.toDouble()
             synth.fill(buf)
             try { dev.writeSamples(buf, 0, buf.size) } catch (e: Throwable) { break }
         }
@@ -88,6 +112,7 @@ enum class SurfaceSound(val roll: Double, val rollCut: Double, val grainRate: Do
 class RideSynth(private val rate: Int) {
     var rpm = 1300.0; var throttle = 0.0; var speed = 0.0; var slip = 0.0; var volume = 0.8
     var surface = SurfaceSound.PAVED
+    var engine = EngineSound.TWIN_270
     private val rnd = Random(7)
     private var crank = 0.0
     private var pulse = 0.0
@@ -110,11 +135,12 @@ class RideSynth(private val rate: Int) {
             val sl = slip
             val vol = volume
             // Muffler resonance tracks rpm a little (bigger boom at low revs).
-            val f0 = 90.0 + r / 60.0 * 0.9
+            val eng = engine
+            val f0 = eng.boomHz + r / 60.0 * eng.boomPerRev
             val w0 = 2 * PI * f0 / rate
             val q = 0.94
             val c1 = 2 * q * kotlin.math.cos(w0); val c2 = -q * q
-            val decay = exp(-1.0 / (rate * (0.0035 + 0.004 * (1 - thr))))
+            val decay = exp(-1.0 / (rate * (eng.ringOpen + (eng.ringClosed - eng.ringOpen) * (1 - thr))))
             // Glide the surface sound over ~50 ms.
             val sf = surface
             val k = min(1.0, buf.size / (0.05 * rate))
@@ -132,8 +158,11 @@ class RideSynth(private val rate: Int) {
                 crank += r / 60.0 * 720.0 / rate // degrees of the 720-degree cycle
                 if (crank >= 720) crank -= 720
                 val a = crank
-                // Firing events at 0 and 270 degrees.
-                if ((lastAngle > a) || (lastAngle < 270 && a >= 270)) pulse += 0.6 + 0.9 * thr + rnd.nextDouble() * 0.15
+                // Firing events.
+                for (f in eng.firingDeg) {
+                    val fired = if (f == 0.0) lastAngle > a else lastAngle < f && a >= f
+                    if (fired) pulse += (0.6 + 0.9 * thr + rnd.nextDouble() * 0.15) * eng.pulse
+                }
                 lastAngle = a
                 pulse *= decay
                 val excite = pulse * (0.7 + 0.3 * rnd.nextDouble())
@@ -146,7 +175,7 @@ class RideSynth(private val rate: Int) {
                 dcOut = lpA - dcIn + 0.995 * dcOut; dcIn = lpA
                 var s = dcOut * 0.09 * (0.9 + 0.5 * thr)
                 // Overrun burble: a soft low pop rather than a click.
-                if (thr < 0.05 && r > 3500 && rnd.nextDouble() < 0.0008) grainEnv += 0.4 * gGrainCut.coerceAtLeast(0.05)
+                if (thr < 0.05 && r > 3000 && rnd.nextDouble() < 0.0008) grainEnv += 0.4 * gGrainCut.coerceAtLeast(0.05)
                 // Wind.
                 val n = rnd.nextDouble() * 2 - 1
                 windLp += (n - windLp) * (0.05 + min(v, 40.0) * 0.004)

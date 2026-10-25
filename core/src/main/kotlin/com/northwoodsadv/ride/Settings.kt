@@ -17,6 +17,8 @@ class Settings {
         set(v) { field = v; assists.applyDifficulty(v) }
     var gpsCollapsed = prefs.getBoolean("gpsCollapsed", false)
     var season = runCatching { Season.valueOf(prefs.getString("season", Season.SUMMER.name)) }.getOrDefault(Season.SUMMER)
+    /** Which bike from [com.northwoodsadv.ride.bikes.Bikes] to ride. */
+    var bikeId = prefs.getString("bike", com.northwoodsadv.ride.bikes.Bikes.all.first().id)
     var camera = runCatching { CameraMode.valueOf(prefs.getString("camera", CameraMode.CHASE.name)) }.getOrDefault(CameraMode.CHASE)
     val assists = Assists(
         steerMode = runCatching { SteerMode.valueOf(prefs.getString("steerMode", SteerMode.LEAN.name)) }.getOrDefault(SteerMode.LEAN),
@@ -34,6 +36,7 @@ class Settings {
         prefs.putBoolean("gpsCollapsed", gpsCollapsed)
         prefs.putString("season", season.name)
         prefs.putString("camera", camera.name)
+        prefs.putString("bike", bikeId)
         prefs.putString("steerMode", assists.steerMode.name)
         prefs.putBoolean("absFront", assists.absFront)
         prefs.putBoolean("absRear", assists.absRear)

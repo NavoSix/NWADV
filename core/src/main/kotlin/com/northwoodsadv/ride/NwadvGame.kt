@@ -21,8 +21,11 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         Gdx.input.inputProcessor = ui
         cache = DiskCache(platform.mapCacheDir)
         ui.resize(Gdx.graphics.width, Gdx.graphics.height)
+        // Development: choose the bike / open the garage from the desktop command line.
+        System.getProperty("nwadv.bike")?.let { settings.bikeId = it }
         val pending = platform.takePendingGpx()
         when {
+            System.getProperty("nwadv.garage") != null -> setScreen(com.northwoodsadv.ride.screens.BikeSelectScreen(this))
             pending != null -> openGpx(pending.first, pending.second)
             startGpx != null -> openGpx(startGpx.substringAfterLast('/'), Gdx.files.absolute(startGpx).readString())
             else -> setScreen(MenuScreen(this))

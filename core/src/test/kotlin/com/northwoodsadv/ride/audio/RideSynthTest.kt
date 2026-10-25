@@ -5,8 +5,9 @@ import kotlin.math.sqrt
 import kotlin.test.assertTrue
 
 class RideSynthTest {
-    private fun rms(rpm: Double, thr: Double): Double {
+    private fun rms(rpm: Double, thr: Double, engine: EngineSound = EngineSound.TWIN_270): Double {
         val s = RideSynth(22050)
+        s.engine = engine
         s.rpm = rpm; s.throttle = thr; s.speed = 0.0
         val buf = FloatArray(512)
         repeat(20) { s.fill(buf) } // settle
@@ -28,6 +29,16 @@ class RideSynthTest {
             for (rpm in listOf(2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7500.0, 9000.0)) {
                 val v = rms(rpm, thr)
                 assertTrue(v > idle * 0.5, "engine should not go quiet at $rpm rpm (rms $v vs idle $idle)")
+            }
+        }
+    }
+
+    @Test fun singleIsAudibleAcrossItsRevRange() {
+        for (thr in listOf(0.0, 0.5, 1.0)) {
+            val idle = rms(1250.0, thr, EngineSound.SINGLE)
+            for (rpm in listOf(2000.0, 3000.0, 4500.0, 6000.0, 7000.0)) {
+                val v = rms(rpm, thr, EngineSound.SINGLE)
+                assertTrue(v > idle * 0.5, "single should not go quiet at $rpm rpm (rms $v vs idle $idle)")
             }
         }
     }

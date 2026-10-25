@@ -13,7 +13,6 @@ import com.northwoodsadv.ride.hud.Dashboard
 import com.northwoodsadv.ride.hud.GpsUnit
 import com.northwoodsadv.ride.hud.RideControls
 import com.northwoodsadv.ride.physics.Autopilot
-import com.northwoodsadv.ride.physics.BikeSpec
 import com.northwoodsadv.ride.physics.Motorcycle
 import com.northwoodsadv.ride.render.BikeRenderer
 import com.northwoodsadv.ride.render.CameraMode
@@ -32,7 +31,8 @@ import kotlin.math.floor
 
 class RideScreen(private val game: NwadvGame, private val world: World) : ScreenAdapter() {
     private val settings = game.settings
-    private val spec = BikeSpec()
+    private val model = com.northwoodsadv.ride.bikes.Bikes.byId(settings.bikeId)
+    private val spec = model.spec
     private val bike = Motorcycle(spec, world.ground)
     private val tracker = RouteTracker(world.route)
     private val autopilot = Autopilot(world.route, world.ground)
@@ -41,13 +41,13 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val shader = WorldShader.create()
     private val baseH = world.ground.height(world.spawnX, world.spawnY, false)
     private val chunks = ChunkManager(ChunkBuilder(world.ground, baseH, settings.season), if (Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Desktop) 3 else 2)
-    private val bikeRenderer = BikeRenderer(spec)
+    private val bikeRenderer = BikeRenderer(spec, model.look())
     private val cam = PerspectiveCamera(62f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     private val chase = ChaseCamera(cam).apply { mode = settings.camera }
     private val gps = GpsUnit(world, tracker, settings)
     private val dash = Dashboard(settings)
     private val bikeM = Matrix4()
-    private val audio = com.northwoodsadv.ride.audio.RideAudio()
+    private val audio = com.northwoodsadv.ride.audio.RideAudio().apply { engine = model.sound }
     private var originE = 0.0; private var originN = 0.0
 
     private var paused = false

@@ -73,6 +73,22 @@ New Hampshire's unmaintained Class VI roads.
   landing, and drowning the bike in deep water. After a crash, or any time from the pause
   menu with **Reset position**, you're put back on the route a few metres behind.
 
+## Bikes
+
+Pick a bike in the **Garage** (main menu, *Bike*). Each one has its own physics, engine sound
+and 3D model, and the garage shows it on a turntable you can spin with a drag. Club members'
+bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
+
+- **Royal Enfield Himalayan 411**, modelled on a club member's bike as set up:
+  - Rock Red, with a tall screen, phone mount, Tusk handguards, crash bars, tank guards, skid
+    plate, pannier frames and rear rack.
+  - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
+  - 207 kg with the accessories.
+  - 21"/17" spoked wheels on knobbies, 200/180 mm travel, 26.5 deg rake.
+  - It sounds like a thumping single.
+  - Ridden with a 90 kg rider, it does 0-100 km/h in about 15 s and tops out near 125 km/h.
+- **Mid-weight ADV twin**: the original generic 100 hp stand-in.
+
 ## Difficulty
 
 The **Difficulty** setting (menu) defaults to *Easy*:

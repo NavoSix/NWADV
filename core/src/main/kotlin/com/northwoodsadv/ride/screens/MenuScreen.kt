@@ -60,6 +60,11 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
             col++
             if (col == 2) { col = 0; sy -= sh + u * 0.8f }
         }
+        // Bike: opens the garage.
+        val bikeName = com.northwoodsadv.ride.bikes.Bikes.byId(s.bikeId).name
+        val bh2 = sh * 0.75f
+        if (ui.button("Bike: $bikeName", sx, sy + sh - bh2, sw, bh2)) { game.setScreen(BikeSelectScreen(game)); ui.endFrame(); return }
+        sy -= bh2 + u * 0.8f
         val a = s.assists
         toggle("Steering", a.steerMode.label) { a.steerMode = if (a.steerMode == SteerMode.LEAN) SteerMode.COUNTERSTEER else SteerMode.LEAN }
         toggle("Difficulty", s.difficulty.label) { s.difficulty = Difficulty.entries[(s.difficulty.ordinal + 1) % Difficulty.entries.size] }

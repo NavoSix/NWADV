@@ -2,6 +2,7 @@ package com.northwoodsadv.ride.render
 
 import com.badlogic.gdx.graphics.Color
 import kotlin.math.cos
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -108,6 +109,112 @@ class MeshBuilder(initialVerts: Int = 1024) {
             flatTri(b[0], b[1], b[2], d[0], d[1], d[2], c[0], c[1], c[2], color)
             flatTri(c[0], c[1], c[2], d[0], d[1], d[2], bx, by, bz, color)
         }
+    }
+
+    /** Flat triangle wound so it faces away from the point (cx, cy, cz). */
+    fun outTri(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, qx: Float, qy: Float, qz: Float,
+               cx: Float, cy: Float, cz: Float, color: Float) {
+        val ux = bx - ax; val uy = by - ay; val uz = bz - az
+        val vx = qx - ax; val vy = qy - ay; val vz = qz - az
+        val nx = uy * vz - uz * vy; val ny = uz * vx - ux * vz; val nz = ux * vy - uy * vx
+        val ox = (ax + bx + qx) / 3 - cx; val oy = (ay + by + qy) / 3 - cy; val oz = (az + bz + qz) / 3 - cz
+        if (nx * ox + ny * oy + nz * oz >= 0) flatTri(ax, ay, az, bx, by, bz, qx, qy, qz, color)
+        else flatTri(ax, ay, az, qx, qy, qz, bx, by, bz, color)
+    }
+
+    /** Thin parts (plates, panels, glass) seen from both sides. */
+    fun twoSidedTri(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, cx: Float, cy: Float, cz: Float, color: Float) {
+        flatTri(ax, ay, az, bx, by, bz, cx, cy, cz, color)
+        flatTri(ax, ay, az, cx, cy, cz, bx, by, bz, color)
+    }
+
+    /**
+     * A shell lofted along X through [stations] of (x, centre y, half height, half width): each
+     * cross-section a rounded rectangle ([square] 0 = ellipse .. 1 = nearly a box), ends capped.
+     * Tanks, seats, fenders, crankcases.
+     */
+    fun loft(stations: Array<FloatArray>, color: Float, sides: Int = 12, square: Float = 0.5f, z: Float = 0f) {
+        val e = 1f - 0.8f * square
+        fun pt(st: FloatArray, i: Int): FloatArray {
+            val a = i * TWO_PI / sides
+            val c = cos(a); val sn = sin(a)
+            val py = st[1] + st[2] * kotlin.math.sign(sn) * kotlin.math.abs(sn).pow(e)
+            val pz = z + st[3] * kotlin.math.sign(c) * kotlin.math.abs(c).pow(e)
+            return floatArrayOf(st[0], py, pz)
+        }
+        for (k in 0 until stations.size - 1) {
+            val s0 = stations[k]; val s1 = stations[k + 1]
+            val cx = (s0[0] + s1[0]) / 2; val cy = (s0[1] + s1[1]) / 2
+            for (i in 0 until sides) {
+                val a = pt(s0, i); val b = pt(s0, i + 1); val c = pt(s1, i + 1); val d = pt(s1, i)
+                outTri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], cx, cy, z, color)
+                outTri(a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2], cx, cy, z, color)
+            }
+        }
+        for (end in listOf(0, stations.size - 1)) {
+            val st = stations[end]
+            val inward = if (end == 0) 1f else -1f
+            val ix = st[0] + inward * 0.05f
+            for (i in 0 until sides) {
+                val a = pt(st, i); val b = pt(st, i + 1)
+                outTri(st[0], st[1], z, a[0], a[1], a[2], b[0], b[1], b[2], ix, st[1], z, color)
+            }
+        }
+    }
+
+    /**
+     * Curved strip around the Z axis through (cx, cy): radius [r] (to the middle of its
+     * thickness [t]), from angle [a0] to [a1] (radians, 0 = +X, increasing toward +Y), [hw] half
+     * width in Z centred on [z]. Fenders, rims, tyres and knobs.
+     */
+    fun arc(cx: Float, cy: Float, r: Float, a0: Float, a1: Float, hw: Float, t: Float, color: Float, segs: Int = 8, z: Float = 0f) {
+        val ri = r - t / 2; val ro = r + t / 2
+        for (k in 0 until segs) {
+            val b0 = a0 + (a1 - a0) * k / segs; val b1 = a0 + (a1 - a0) * (k + 1) / segs
+            val c0 = cos(b0); val s0 = sin(b0); val c1 = cos(b1); val s1 = sin(b1)
+            val mid = (b0 + b1) / 2
+            val mx = cx + cos(mid) * r; val my = cy + sin(mid) * r
+            // Corners: o/i = outer/inner radius, 0/1 = start/end angle, n/f = -z/+z side.
+            val o0 = floatArrayOf(cx + c0 * ro, cy + s0 * ro); val o1 = floatArrayOf(cx + c1 * ro, cy + s1 * ro)
+            val i0 = floatArrayOf(cx + c0 * ri, cy + s0 * ri); val i1 = floatArrayOf(cx + c1 * ri, cy + s1 * ri)
+            val zn = z - hw; val zf = z + hw
+            fun q(p: FloatArray, pz: Float, qq: FloatArray, qz: Float, w: FloatArray, wz: Float, v: FloatArray, vz: Float) {
+                outTri(p[0], p[1], pz, qq[0], qq[1], qz, w[0], w[1], wz, mx, my, z, color)
+                outTri(p[0], p[1], pz, w[0], w[1], wz, v[0], v[1], vz, mx, my, z, color)
+            }
+            q(o0, zn, o1, zn, o1, zf, o0, zf)       // outer face
+            q(i0, zn, i1, zn, i1, zf, i0, zf)       // inner face
+            q(o0, zn, o1, zn, i1, zn, i0, zn)       // -z side
+            q(o0, zf, o1, zf, i1, zf, i0, zf)       // +z side
+            if (k == 0) q(o0, zn, o0, zf, i0, zf, i0, zn)
+            if (k == segs - 1) q(o1, zn, o1, zf, i1, zf, i1, zn)
+        }
+    }
+
+    /**
+     * Spoked dual-sport wheel around the Z axis at the origin: knobby tyre of outer radius [r]
+     * and section height [tyreH], rim, [spokes] crossed spokes and a hub.
+     */
+    fun spokedWheel(r: Float, tyreH: Float, halfW: Float, spokes: Int, tyre: Float, knob: Float, rim: Float, spoke: Float, hub: Float) {
+        arc(0f, 0f, r - tyreH / 2 - 0.004f, 0f, TWO_PI, halfW, tyreH - 0.008f, tyre, 24)
+        // Knobs in two staggered rows plus a centre row.
+        val n = 26
+        for (k in 0 until n) {
+            val a = k * TWO_PI / n
+            val zOff = if (k % 2 == 0) halfW * 0.5f else -halfW * 0.5f
+            arc(0f, 0f, r - 0.006f, a, a + 0.11f, halfW * 0.38f, 0.014f, knob, 1, zOff)
+            if (k % 2 == 1) arc(0f, 0f, r - 0.006f, a + 0.12f, a + 0.2f, halfW * 0.22f, 0.014f, knob, 1, 0f)
+        }
+        val rimR = r - tyreH - 0.008f
+        arc(0f, 0f, rimR, 0f, TWO_PI, 0.02f, 0.022f, rim, 24)
+        for (k in 0 until spokes) {
+            val a = k * TWO_PI / spokes
+            val side = if (k % 2 == 0) 1f else -1f
+            // Tangential lacing: each spoke leaves the hub flange ahead of where it meets the rim.
+            val ha = a + side * 0.5f
+            beam(cos(ha) * 0.045f, sin(ha) * 0.045f, side * 0.045f, cos(a) * (rimR - 0.012f), sin(a) * (rimR - 0.012f), side * 0.008f, 0.0028f, spoke)
+        }
+        tube(0f, 0f, -0.065f, 0f, 0f, 0.065f, 0.042f, 0.042f, 10, hub, hub)
     }
 
     /** Axis-aligned box centred at (x, y, z). */

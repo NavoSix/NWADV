@@ -35,7 +35,8 @@ class DesktopPlatform(touch: Boolean = false) : Platform {
 /**
  * Usage: desktop [route.gpx] [--auto] [--size 1600x900] [--shots out-dir --shot-times 5,10,20]
  * The screenshot options are for automated visual checks. Development extras: --no-hud,
- * --start-at <route m>, --start-road-at [<road>:]<m>, --dev-streams <route m,...>.
+ * --start-at <route m>, --start-road-at [<road>:]<m>, --dev-streams <route m,...>,
+ * --bike <id>, --garage.
  */
 fun main(args: Array<String>) {
     var gpx: String? = null
@@ -60,6 +61,9 @@ fun main(args: Array<String>) {
             "--start-road-at" -> System.setProperty("nwadv.startRoadAt", args[++i])
             "--no-hud" -> System.setProperty("nwadv.noHud", "1")
             "--dev-streams" -> System.setProperty("nwadv.devStreams", args[++i])
+            "--bike" -> System.setProperty("nwadv.bike", args[++i])
+            "--garage" -> System.setProperty("nwadv.garage", "1")
+            "--garage-angle" -> System.setProperty("nwadv.garageAngle", args[++i])
             else -> gpx = File(args[i]).absolutePath
         }
         i++

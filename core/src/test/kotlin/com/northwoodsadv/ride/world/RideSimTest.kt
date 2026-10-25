@@ -27,7 +27,7 @@ class RideSimTest {
         val world = WorldBuilder(DiskCache(File("build/ride-cache"))).build(gpx) { stage, f -> if (f == 0f) println("  $stage") }
         println("world built in %.1f s: %d roads, notes=%s".format((System.nanoTime() - t0) / 1e9, world.roads.size, world.notes))
 
-        val bike = Motorcycle(BikeSpec(), world.ground)
+        val bike = Motorcycle(com.northwoodsadv.ride.bikes.Bikes.byId(System.getenv("NWADV_BIKE")).spec, world.ground)
         bike.reset(world.spawnX, world.spawnY, world.spawnHeading)
         val auto = Autopilot(world.route, world.ground)
         val tracker = RouteTracker(world.route)

@@ -28,10 +28,11 @@ class Dashboard(private val settings: Settings) {
         // Right block: tach bar, then two text rows.
         val tx = x + u * 20f; val tw = w - u * 21f
         val barTop = top - u * 0.2f
-        val frac = (bike.rpm / 10_000).toFloat().coerceIn(0f, 1f)
+        val red = bike.spec.redlineRpm
+        val frac = (bike.rpm / (red * 1.05)).toFloat().coerceIn(0f, 1f)
         ui.shapes.begin(ShapeRenderer.ShapeType.Filled)
         ui.shapes.color = Color(0.2f, 0.2f, 0.2f, 1f); ui.shapes.rect(tx, barTop - u * 1.2f, tw, u * 1.2f)
-        ui.shapes.color = if (bike.rpm > 8500) Color.RED else if (bike.rpm > 7000) Color.ORANGE else Color(0.4f, 0.85f, 0.4f, 1f)
+        ui.shapes.color = if (bike.rpm > red * 0.9) Color.RED else if (bike.rpm > red * 0.74) Color.ORANGE else Color(0.4f, 0.85f, 0.4f, 1f)
         ui.shapes.rect(tx, barTop - u * 1.2f, tw * frac, u * 1.2f)
         ui.shapes.end()
         val r1 = barTop - u * 1.6f

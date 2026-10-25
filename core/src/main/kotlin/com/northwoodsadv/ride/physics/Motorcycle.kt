@@ -363,7 +363,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         } else {
             // Slipping clutch (centrifugal-style auto clutch engages with revs). Engine and wheel
             // are coupled through a 16:1 ratio, so the clutch is solved implicitly with the tyre.
-            val engage = if (ratio == 0.0) 0.0 else Noise.smoothstep(spec.idleRpm * 1.1, 2900.0, rpmNow)
+            val engage = if (ratio == 0.0) 0.0 else Noise.smoothstep(spec.idleRpm * 1.1, spec.idleRpm + spec.redlineRpm * 0.17, rpmNow)
             val slip0 = engineOmega - omegaR * ratio
             val cmax = min(200.0 * engage, tcClutchCap) * wheelieFactor
             val th = tanh(slip0 / CLUTCH_SLIP)
@@ -630,10 +630,12 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         var want = 0
         if (input.shiftUp) want = 1 else if (input.shiftDown) want = -1
         else if (a.autoShift) {
-            val upAt = 4600 + 3800 * throttleSmoothed
+            // Shift points scale with the engine's rev range (a single revs out far lower).
+            val red = spec.redlineRpm
+            val upAt = red * (0.48 + 0.44 * throttleSmoothed)
             if (rpmNow > upAt && gear < spec.gearRatios.size && tcFactor > 0.9) want = 1
-            else if (rpmNow < 2600 + 1600 * throttleSmoothed && gear > 1 && throttleSmoothed > 0.3) want = -1
-            else if (rpmNow < 2200 && gear > 1) want = -1
+            else if (rpmNow < red * (0.27 + 0.17 * throttleSmoothed) && gear > 1 && throttleSmoothed > 0.3) want = -1
+            else if (rpmNow < max(red * 0.23, spec.idleRpm * 1.45) && gear > 1) want = -1
         }
         if (want == 0) return
         val ng = (gear + want).coerceIn(1, spec.gearRatios.size)

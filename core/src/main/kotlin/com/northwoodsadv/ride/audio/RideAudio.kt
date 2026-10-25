@@ -27,6 +27,10 @@ class EngineSound(
     val ringOpen: Double,
     /** Recorded firing cycles ([GrainBank] asset) to play instead of the synthesised pulse. */
     val grainAsset: String? = null,
+    /** How much header/muffler resonance ("throat") is added to recordings, 0..1. */
+    val throat: Double = 0.0,
+    /** How readily the pipe pops on the overrun, 0..1. */
+    val pops: Double = 0.5,
 ) {
     companion object {
         /** 270-degree crank parallel twin: the uneven lope of most mid-weight ADV twins. */
@@ -34,7 +38,7 @@ class EngineSound(
         /** Big air-cooled single: one deep thump every other revolution. */
         val SINGLE = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005)
         /** Donovan's Himalayan 411, recorded holding idle, 1,900, 2,850, 4,000 and 4,800 rpm. */
-        val HIMALAYAN_411 = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005, "sounds/himalayan411.grains")
+        val HIMALAYAN_411 = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005, "sounds/himalayan411.grains", throat = 1.0, pops = 1.0)
     }
 }
 
@@ -177,6 +181,22 @@ class RideSynth(private val rate: Int) {
     }
     private var crank = 0.0
     private var cycleJitter = 1.0
+    // Exhaust body: header and muffler resonances, and a little high cut, for the recordings.
+    private val bodyLow = Biquad(); private val bodyMid = Biquad()
+    private var bodyLp = 0.0
+    // Overrun pops: armed by a spell on the throttle, likeliest just after it closes.
+    private var armed = 0.0
+    private var overrunT = 10.0
+    private var crackEnv = 0.0; private var crackLp = 0.0
+    private var thumpEnv = 0.0; private var thumpPhase = 0.0; private var thumpHz = 120.0
+    private var popDelay = -1; private var popDelayAmp = 0.0
+
+    private fun pop(amp: Double) {
+        crackEnv += amp
+        thumpEnv += amp * 0.8
+        thumpPhase = 0.0
+        thumpHz = 100.0 + rnd.nextDouble() * 70.0
+    }
     private var pulse = 0.0
     private var lpA = 0.0; private var bp1 = 0.0; private var bp2 = 0.0
     private var windLp = 0.0
@@ -217,6 +237,22 @@ class RideSynth(private val rate: Int) {
             val grainP = gRate * min(1.0, v / 6.0) * (22050.0 / rate)
             val grainGain = gGrain / sqrt(gGrainCut)
             val scrubAmt = (sl - 0.9).coerceIn(0.0, 1.5) * min(1.0, v / 4) * 0.12
+            // Exhaust body for recordings: a chesty header mode and a muffler mode that rises a
+            // little with revs, both stronger under load.
+            val throat = if (bank != null) eng.throat else 0.0
+            if (throat > 0) {
+                bodyLow.setPeak(rate, 95.0, 0.9, throat * (4.0 + 3.0 * thr))
+                bodyMid.setPeak(rate, 200.0 + r / 60.0 * 0.8, 1.4, throat * (5.0 + 3.0 * thr))
+            }
+            // Pops: after some throttle, closing it above ~2,200 rpm lets unburnt fuel light off
+            // in the pipe; most often right after the throttle shuts, dying away over seconds.
+            val dt = buf.size.toDouble() / rate
+            if (thr > 0.25) { armed = 1.0; overrunT = 0.0 } else if (thr < 0.06) overrunT += dt
+            if (thr < 0.06) armed = (armed - dt * 0.12).coerceAtLeast(0.0)
+            val popChance = if (thr < 0.06) eng.pops * 0.3 * armed * exp(-overrunT / 1.3) *
+                ((r - 2200) / 1400).coerceIn(0.0, 1.0) else 0.0
+            val crackDecay = exp(-1.0 / (rate * 0.0035))
+            val thumpDecay = exp(-1.0 / (rate * 0.028))
             for (i in buf.indices) {
                 crank += r / 60.0 * 360.0 / rate * cycleJitter // degrees of the 720-degree (two-revolution) cycle
                 if (crank >= 720) crank -= 720
@@ -230,6 +266,11 @@ class RideSynth(private val rate: Int) {
                         if (f == eng.firingDeg[0]) cycleJitter = 1 + (rnd.nextDouble() * 2 - 1) * (0.03 - 0.02 * thr)
                         if (bank != null) fireGrains(bank, r, thr)
                         else pulse += (0.6 + 0.9 * thr + rnd.nextDouble() * 0.15) * eng.pulse
+                        if (popChance > 0 && rnd.nextDouble() < popChance) {
+                            pop(0.35 + 0.55 * rnd.nextDouble())
+                            // Now and then a second crack right behind it: the crackle.
+                            if (rnd.nextDouble() < 0.3) { popDelay = (rate * (0.008 + 0.02 * rnd.nextDouble())).toInt(); popDelayAmp = 0.2 + 0.4 * rnd.nextDouble() }
+                        }
                     }
                 }
                 lastAngle = a
@@ -243,8 +284,22 @@ class RideSynth(private val rate: Int) {
                 // DC blocker, then level.
                 dcOut = lpA - dcIn + 0.995 * dcOut; dcIn = lpA
                 var s = if (bank != null) grainSample() * GRAIN_LEVEL else dcOut * 0.09 * (0.9 + 0.5 * thr)
-                // Overrun burble: a soft low pop rather than a click.
-                if (thr < 0.05 && r > 3000 && rnd.nextDouble() < 0.0008) grainEnv += 0.4 * gGrainCut.coerceAtLeast(0.05)
+                // Pops: a sharp crack (lightly filtered noise) on a short low thump.
+                if (popDelay >= 0 && popDelay-- == 0) pop(popDelayAmp)
+                if (crackEnv > 1e-4 || thumpEnv > 1e-4) {
+                    crackLp += ((rnd.nextDouble() * 2 - 1) - crackLp) * 0.55
+                    thumpPhase += 2 * PI * thumpHz / rate
+                    s += crackLp * crackEnv * 0.9 + kotlin.math.sin(thumpPhase) * thumpEnv * 0.55
+                    crackEnv *= crackDecay; thumpEnv *= thumpDecay
+                }
+                if (throat > 0) {
+                    s = bodyMid.process(bodyLow.process(s))
+                    // Take a little fizz off the top, then a touch of saturation for growl.
+                    bodyLp += (s - bodyLp) * 0.35
+                    s = bodyLp + (s - bodyLp) * (1 - 0.3 * throat)
+                    val drive = 1 + 0.8 * throat
+                    s = kotlin.math.tanh(s * drive) / drive * THROAT_TRIM
+                }
                 // Wind.
                 val n = rnd.nextDouble() * 2 - 1
                 windLp += (n - windLp) * (0.05 + min(v, 40.0) * 0.004)
@@ -273,5 +328,7 @@ class RideSynth(private val rate: Int) {
     companion object {
         /** Recorded engine level in the mix (the recordings peak near 0.9). */
         const val GRAIN_LEVEL = 1.1
+        /** Keeps the overall level about the same once the resonances are added. */
+        const val THROAT_TRIM = 0.72
     }
 }

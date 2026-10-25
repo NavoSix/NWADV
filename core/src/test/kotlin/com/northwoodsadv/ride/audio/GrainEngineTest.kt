@@ -49,10 +49,10 @@ class GrainEngineTest {
         s.engine = EngineSound.HIMALAYAN_411; s.grains = bank
         val samples = ArrayList<Float>()
         val buf = FloatArray(256)
-        val total = 22.0
+        val total = 30.0
         var t = 0.0
         while (t < total) {
-            // Idle, the recorded holds, a full-throttle pull to the limiter, then roll off.
+            // Idle, the recorded holds, a full-throttle pull, a roll-off, then throttle blips.
             val (rpm, thr) = when {
                 t < 3 -> 1340.0 to 0.0
                 t < 5 -> 1900.0 to 0.2
@@ -62,6 +62,12 @@ class GrainEngineTest {
                 t < 12 -> 4800.0 - (t - 11) * 3000 to 0.0
                 t < 17 -> 1500.0 + (t - 12) / 5 * 5300 to 1.0
                 t < 21 -> 6800.0 - (t - 17) / 4 * 5400 to 0.0
+                t < 22 -> 1340.0 to 0.0
+                // Three throttle blips, each closed sharply (pops on the way down).
+                t < 28 -> {
+                    val u = (t - 22) % 2.0
+                    if (u < 0.45) 1340.0 + u / 0.45 * 3800 to 1.0 else 5140.0 - (u - 0.45) / 1.55 * 3800 to 0.0
+                }
                 else -> 1340.0 to 0.0
             }
             s.rpm = rpm; s.throttle = thr; s.speed = 0.0

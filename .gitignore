@@ -11,3 +11,4 @@ captures/
 *.keystore
 tools/sample-routes/.dem-cache/
 /assets/saved-routes/
+assets/.lwjgl/

@@ -24,17 +24,19 @@ class BikeSpec(
     val rearWheelInertia: Double = 0.95,
 
     /** Wheel, tyre, brake disc and fork lowers / swingarm share (moves with the wheel). */
-    val unsprungFront: Double = 17.0,
-    val unsprungRear: Double = 22.0,
+    val unsprungFront: Double = 14.0,
+    val unsprungRear: Double = 17.0,
     val frontTyreStiffness: Double = 95_000.0,
     val rearTyreStiffness: Double = 110_000.0,
+    /** Carcass hysteresis: soft, aired-down knobbies don't bounce like a basketball. */
+    val tyreDamping: Double = 1_100.0,
 
     val frontTravel: Double = 0.27,
     val rearTravel: Double = 0.26,
     val frontSpring: Double = 15_500.0,
     val rearSpring: Double = 16_500.0,
     val frontCompDamp: Double = 850.0,
-    val frontRebDamp: Double = 1_450.0,
+    val frontRebDamp: Double = 1_550.0,
     val rearCompDamp: Double = 900.0,
     val rearRebDamp: Double = 1_550.0,
 

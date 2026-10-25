@@ -55,6 +55,8 @@ fun main(args: Array<String>) {
             "--camera" -> camera = args[++i]
             "--touch" -> touch = true
             "--gps-collapsed" -> gpsCollapsed = true
+            "--start-at" -> System.setProperty("nwadv.startAt", args[++i])
+            "--start-road-at" -> System.setProperty("nwadv.startRoadAt", args[++i])
             else -> gpx = File(args[i]).absolutePath
         }
         i++

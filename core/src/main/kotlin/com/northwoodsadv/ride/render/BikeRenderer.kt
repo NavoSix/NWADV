@@ -17,6 +17,9 @@ import kotlin.math.sin
 class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : Disposable {
     private val chassisSeated: Mesh
     private val chassisStanding: Mesh
+    private val chassisNoLegs: Mesh
+    private val legL: Mesh
+    private val legR: Mesh
     private val front: Mesh
     private val wheelF: Mesh
     private val wheelR: Mesh
@@ -32,7 +35,7 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         val rf = spec.frontRadius.toFloat(); val rr = spec.rearRadius.toFloat()
         val red = MeshBuilder.color(0xd8282e); val dark = MeshBuilder.color(0x4a4a50); val black = MeshBuilder.color(0x141414)
         val alu = MeshBuilder.color(0xc8cace); val grey = MeshBuilder.color(0x76787c)
-        fun chassis(standing: Boolean): Mesh {
+        fun chassis(standing: Boolean, legs: Boolean = true): Mesh {
             val m = MeshBuilder(2048)
             m.box(0.05f, 0.48f, 0f, 0.30f, 0.17f, 0.15f, dark)                  // engine
             m.box(0.22f, 0.88f, 0f, 0.22f, 0.10f, 0.17f, red)                   // tank
@@ -58,7 +61,7 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
                 for (side in listOf(-1f, 1f)) m.beam(0.10f, 1.55f, side * 0.2f, 0.42f, 1.12f, side * 0.36f, 0.045f, jacket)
                 m.blob(0.16f, 1.78f, 0f, 0.14f, 0.15f, 0.13f, helmet)
             } else {
-                for (side in listOf(-1f, 1f)) {
+                if (legs) for (side in listOf(-1f, 1f)) {
                     m.beam(-0.05f, 0.42f, side * 0.17f, 0.05f, 0.75f, side * 0.18f, 0.06f, pants)
                     m.beam(0.05f, 0.75f, side * 0.18f, -0.28f, 0.98f, side * 0.14f, 0.07f, pants)
                     m.box(-0.03f, 0.40f, side * 0.17f, 0.12f, 0.05f, 0.05f, boot)
@@ -71,6 +74,18 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         }
         chassisSeated = chassis(false)
         chassisStanding = chassis(true)
+        chassisNoLegs = chassis(false, legs = false)
+        // A leg reaching down to the ground, built about the hip so it can swing.
+        fun leg(side: Float): Mesh {
+            val m = MeshBuilder(256)
+            val pants = MeshBuilder.color(0x30343a)
+            val hx = HIP_X; val hy = HIP_Y; val hz = side * 0.15f
+            m.beam(hx, hy, hz, 0.02f, 0.52f, side * 0.33f, 0.07f, pants)          // thigh
+            m.beam(0.02f, 0.52f, side * 0.33f, -0.02f, 0.06f, side * 0.44f, 0.06f, pants) // shin
+            m.box(0.04f, 0.05f, side * 0.44f, 0.13f, 0.05f, 0.055f, MeshBuilder.color(0x141414))
+            return toMesh(m)
+        }
+        legL = leg(-1f); legR = leg(1f)
 
         // Front assembly in steering-head space (origin at the head, before rotation).
         val fm = MeshBuilder(512)
@@ -99,6 +114,11 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         }
         for (i in 1..16) sm.tri(c0, i + 1, i)
         shadow = toMesh(sm)
+    }
+
+    companion object {
+        private const val HIP_X = -0.22f
+        private const val HIP_Y = 0.98f
     }
 
     private fun toMesh(m: MeshBuilder): Mesh {
@@ -137,7 +157,17 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
         shadow.render(shader, GL20.GL_TRIANGLES)
 
         shader.setUniformMatrix("u_model", base)
-        (if (bike.standing) chassisStanding else chassisSeated).render(shader, GL20.GL_TRIANGLES)
+        if (bike.feetDown && !bike.standing) {
+            chassisNoLegs.render(shader, GL20.GL_TRIANGLES)
+            // Feet on the ground; paddling swings them alternately like walking the bike back.
+            val swing = if (bike.paddling) (sin(bike.paddlePhase) * 0.35).toFloat() else 0f
+            for ((mesh, sgn) in listOf(legL to 1f, legR to -1f)) {
+                m.set(base).translate(HIP_X, HIP_Y, 0f).rotateRad(0f, 0f, 1f, swing * sgn).translate(-HIP_X, -HIP_Y, 0f)
+                shader.setUniformMatrix("u_model", m)
+                mesh.render(shader, GL20.GL_TRIANGLES)
+            }
+            shader.setUniformMatrix("u_model", base)
+        } else (if (bike.standing) chassisStanding else chassisSeated).render(shader, GL20.GL_TRIANGLES)
 
         // Rear wheel moves up with the shock.
         val b = spec.cgToRear.toFloat(); val rr = spec.rearRadius.toFloat()
@@ -163,6 +193,6 @@ class BikeRenderer(private val spec: com.northwoodsadv.ride.physics.BikeSpec) : 
     }
 
     override fun dispose() {
-        chassisSeated.dispose(); chassisStanding.dispose(); front.dispose(); wheelF.dispose(); wheelR.dispose(); shadow.dispose()
+        chassisSeated.dispose(); chassisStanding.dispose(); chassisNoLegs.dispose(); legL.dispose(); legR.dispose(); front.dispose(); wheelF.dispose(); wheelR.dispose(); shadow.dispose()
     }
 }

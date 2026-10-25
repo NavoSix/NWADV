@@ -190,3 +190,74 @@ class BumpStabilityTest {
         assertTrue(Math.toDegrees(maxHdg) < 15, "heading stays within 15 deg")
     }
 }
+
+class LowSpeedSteeringTest {
+    private fun leanAt(speed: Double): Pair<Double, Double> {
+        val b = Motorcycle(BikeSpec(), TestWorlds.pad(Surface.DIRT, RoadKind.GRAVEL))
+        b.reset(0.0, 0.0, 0.0)
+        val easy = Assists().apply { applyDifficulty(Difficulty.EASY) }
+        val r = TestRider(b, easy)
+        r.run(6.0) { r.holdSpeed(speed, it) }
+        var maxLean = 0.0; var yaw = 0.0
+        r.run(5.0) { r.holdSpeed(speed, it); it.steer = 1.0; maxLean = maxOf(maxLean, abs(b.lean)); yaw = abs(b.yawRate) }
+        assertNull(b.crash, "no crash at $speed m/s")
+        println("full steer at %.1f mph: max lean %.1f deg, yaw rate %.2f rad/s".format(speed * 2.237, Math.toDegrees(maxLean), yaw))
+        return Math.toDegrees(maxLean) to yaw
+    }
+
+    @Test fun uprightBelowFiveMphThenLeanGrowsWithSpeed() {
+        val (l1, y1) = leanAt(1.3)   // ~3 mph
+        val (l2, _) = leanAt(2.0)    // ~4.5 mph
+        assertTrue(l1 < 3 && l2 < 4, "bike stays upright below 5 mph ($l1, $l2)")
+        assertTrue(y1 > 0.3, "and still turns sharply with the bars")
+        val leans = listOf(3.5, 5.0, 7.0, 10.0).map { leanAt(it).first }
+        for (i in 1 until leans.size) assertTrue(leans[i] > leans[i - 1], "lean grows with speed: $leans")
+    }
+}
+
+class RearTyreTest {
+    @Test fun rearStaysPlantedOnRoughGround() {
+        for ((speed, rough) in listOf(7.0 to 0.75, 10.0 to 0.9)) {
+            val ground = TestWorlds.pad(Surface.DIRT, RoadKind.CLASS_VI, rough, TestWorlds.Slope(0.05))
+            val b = Motorcycle(BikeSpec(), ground)
+            b.reset(0.0, 0.0, 0.0)
+            val easy = Assists().apply { applyDifficulty(Difficulty.EASY) }
+            val r = TestRider(b, easy)
+            r.run(4.0) { r.holdSpeed(speed, it) }
+            var slip2 = 0.0; var n = 0; var unloaded = 0; var maxSlip = 0.0
+            r.run(20.0) {
+                r.holdSpeed(speed, it); it.steer = if ((r.time / 3).toInt() % 2 == 0) 0.3 else -0.3
+                slip2 += b.tanAlphaR * b.tanAlphaR; n++; if (b.fzR < 150) unloaded++
+                maxSlip = maxOf(maxSlip, abs(b.tanAlphaR))
+            }
+            val rms = kotlin.math.sqrt(slip2 / n)
+            println("rear v=$speed rough=$rough: rms slip=%.3f max=%.3f unloaded=%.1f%% crash=%s".format(rms, maxSlip, unloaded * 100.0 / n, b.crash))
+            assertNull(b.crash)
+            assertTrue(rms < 0.03, "rear tyre stays hooked up (rms slip $rms)")
+            assertTrue(unloaded * 100.0 / n < if (rough > 0.8) 20 else 12, "rear wheel mostly on the ground")
+        }
+    }
+}
+
+class ReverseTest {
+    @Test fun rearBrakeAtAStopPaddlesBackwards() {
+        val b = Motorcycle(BikeSpec(), TestWorlds.pad(Surface.DIRT, RoadKind.GRAVEL))
+        b.reset(0.0, 0.0, 0.0)
+        val r = TestRider(b, Assists().apply { applyDifficulty(Difficulty.EASY) })
+        r.run(2.0)
+        r.run(4.0) { it.rearBrake = 1.0; it.steer = 0.5 }
+        println("reverse: x=%.2f u=%.2f yaw=%.2f paddling=%s lean=%.1f".format(b.x, b.forwardSpeed, b.yaw, b.paddling, Math.toDegrees(b.lean)))
+        assertNull(b.crash)
+        assertTrue(b.paddling)
+        assertTrue(b.x < -1.5, "moved backwards")
+        assertTrue(b.forwardSpeed > -1.4, "at walking pace")
+        assertTrue(abs(b.yaw) > 0.05, "can steer while backing up")
+        assertTrue(abs(b.lean) < 0.1, "upright")
+        // Riding: rear brake while moving is still a brake.
+        r.run(1.0) { it.rearBrake = 0.0; it.steer = 0.0 }
+        r.run(6.0) { r.holdSpeed(8.0, it) }
+        val v0 = b.forwardSpeed
+        r.run(1.0) { it.throttle = 0.0; it.rearBrake = 1.0 }
+        assertTrue(!b.paddling && b.forwardSpeed < v0 - 2, "rear brake slows a moving bike")
+    }
+}

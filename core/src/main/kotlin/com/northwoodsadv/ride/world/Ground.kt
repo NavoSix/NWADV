@@ -49,7 +49,7 @@ class Ground(
 ) {
     private val roadIndex = SegmentIndex(roads.map { it.line }, DoubleArray(roads.size) { influence(roads[it]) })
     private val streamIndex = SegmentIndex(streams.map { it.line }, DoubleArray(streams.size) { streams[it].width / 2 + BANK })
-    private val hitsTL = ThreadLocal.withInitial { Array(8) { SegmentIndex.Hit() } }
+    private val hitsTL = ThreadLocal.withInitial { Array(16) { SegmentIndex.Hit() } }
     private val maxInfluence = roads.maxOfOrNull { influence(it) } ?: 1.0
 
     fun shoulder(r: Road) = when (r.spec.kind) {
@@ -101,9 +101,10 @@ class Ground(
 
     /**
      * Fills [out] for the point (e, n). With [micro] false only the large-scale shape is computed
-     * (used for distant terrain meshes).
+     * (used for distant terrain meshes). [obstacles] false leaves out logs and big rocks (the
+     * renderer draws those as their own meshes).
      */
-    fun sample(e: Double, n: Double, out: GroundSample, micro: Boolean = true): GroundSample {
+    fun sample(e: Double, n: Double, out: GroundSample, micro: Boolean = true, obstacles: Boolean = true): GroundSample {
         val terrain = elevation.height(e, n)
         out.height = terrain; out.road = -1; out.onRoad = false; out.roadBlend = 0.0
         out.waterDepth = 0.0; out.grassStrip = false; out.puddle = false
@@ -147,6 +148,8 @@ class Ground(
                 else -> out.surface = landSurface(out.landcover, terrain)
             }
             if (micro && ad <= r.halfWidth + shoulder(r)) RoadFeatures.apply(r, h.along, h.lateral, out)
+            // Fallen trees and big rocks on Class VI (logs reach past the road edges).
+            if (micro && obstacles && r.spec.isClassVI) out.height += TrailObstacles.bump(r, h.along, h.lateral, out)
         } else {
             out.surface = landSurface(out.landcover, terrain)
         }

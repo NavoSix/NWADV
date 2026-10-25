@@ -45,7 +45,7 @@ class WorldBuilder(private val cache: DiskCache) {
         val points = gpx.ridePoints
         val bounds = GeoBounds.of(points)
         val proj = LocalProjection(bounds.center)
-        val route = Polyline.from(points, proj)
+        val route = Polyline.from(points, proj).rounded(5.0)
 
         // --- elevation ---------------------------------------------------------------------
         val knownEle = points.map { it.ele }.filter { !it.isNaN() }
@@ -77,7 +77,8 @@ class WorldBuilder(private val cache: DiskCache) {
             val spec = RoadClassifier.classify(w.tags) ?: continue
             val xs = DoubleArray(w.points.size) { proj.east(w.points[it].lon) }
             val ys = DoubleArray(w.points.size) { proj.north(w.points[it].lat) }
-            for (line in Road.splitLong(xs, ys)) if (line.length > 1.0) roads += Road(w.id, spec, line, elevation)
+            val rounded = Polyline(xs, ys).rounded()
+            for (line in Road.splitLong(rounded.xs, rounded.ys)) if (line.length > 1.0) roads += Road(w.id, spec, line, elevation)
         }
         val osmRoadCount = roads.size
 
@@ -86,7 +87,7 @@ class WorldBuilder(private val cache: DiskCache) {
         val probe = Ground(elevation, roads)
         var trailId = -1000L
         for (track in gpx.tracks) {
-            val line = Polyline.from(track.points, proj).resample(10.0)
+            val line = Polyline.from(track.points, proj).rounded(5.0)
             val spec = trackSpec(track, osmRoadCount > 0)
             if (osmRoadCount == 0) {
                 for (piece in Road.splitLong(line.xs, line.ys)) roads += Road(trailId--, spec, piece, elevation)
@@ -143,7 +144,7 @@ class WorldBuilder(private val cache: DiskCache) {
 
     companion object {
         /**
-         * Index ranges of a GPX line (resampled every 10 m) that are NOT riding along a mapped
+         * Index ranges of a GPX line (evenly resampled) that are NOT riding along a mapped
          * road. Being near a road isn't enough: the track has to run alongside it (within ~10 m
          * and heading the same way) for at least 80 m. So crossing a road, or passing close to
          * one, keeps the trail continuous. Ranges overlap 30 m into the roads they join.
@@ -151,6 +152,7 @@ class WorldBuilder(private val cache: DiskCache) {
         fun offRoadRuns(line: Polyline, ground: Ground): List<IntRange> {
             val n = line.size
             if (n < 2) return emptyList()
+            val spacing = (line.length / (n - 1)).coerceAtLeast(0.5)
             val follows = BooleanArray(n)
             val hit = DoubleArray(2)
             for (i in 0 until n) {
@@ -168,7 +170,7 @@ class WorldBuilder(private val cache: DiskCache) {
                 if (!follows[i]) { i++; continue }
                 var j = i
                 while (j < n && follows[j]) j++
-                if (j - i < 8) for (k in i until j) follows[k] = false
+                if (j - i < (80.0 / spacing).toInt()) for (k in i until j) follows[k] = false
                 i = j
             }
             val out = ArrayList<IntRange>()
@@ -177,7 +179,8 @@ class WorldBuilder(private val cache: DiskCache) {
                 if (follows[i]) { i++; continue }
                 var j = i
                 while (j < n && !follows[j]) j++
-                val a = maxOf(0, i - 3); val b = minOf(n - 1, j - 1 + 3)
+                val pad = (30.0 / spacing).toInt()
+                val a = maxOf(0, i - pad); val b = minOf(n - 1, j - 1 + pad)
                 if (b > a) out += a..b
                 i = j
             }
@@ -188,10 +191,10 @@ class WorldBuilder(private val cache: DiskCache) {
         fun offline(gpx: GpxFile, elevation: (LocalProjection) -> Elevation): World {
             val points = gpx.ridePoints
             val proj = LocalProjection(GeoBounds.of(points).center)
-            val route = Polyline.from(points, proj)
+            val route = Polyline.from(points, proj).rounded(5.0)
             val elev = elevation(proj)
             val roads = gpx.tracks.flatMapIndexed { i, t ->
-                val line = Polyline.from(t.points, proj).resample(10.0)
+                val line = Polyline.from(t.points, proj).rounded(5.0)
                 Road.splitLong(line.xs, line.ys).map { Road(-1000L - i, WorldBuilder(DiskCache(java.io.File("."))).trackSpec(t, false), it, elev) }
             }
             val tmp = DoubleArray(3); route.pointAt(0.0, tmp)

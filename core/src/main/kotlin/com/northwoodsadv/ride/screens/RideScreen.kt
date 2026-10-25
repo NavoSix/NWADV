@@ -62,6 +62,13 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
 
     init {
         bike.reset(world.spawnX, world.spawnY, world.spawnHeading)
+        // Development: start part-way along the route (desktop --start-at <metres>).
+        System.getProperty("nwadv.startAt")?.toDoubleOrNull()?.let { at ->
+            val p = DoubleArray(3); world.route.pointAt(at, p); bike.reset(p[0], p[1], p[2])
+        }
+        System.getProperty("nwadv.startRoadAt")?.toDoubleOrNull()?.let { at ->
+            val p = DoubleArray(3); world.roads[0].line.pointAt(at, p); bike.reset(p[0], p[1], p[2])
+        }
         rebase(true)
         banner = world.name; bannerTimer = 4.0
     }
@@ -230,15 +237,18 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         val u = ui.u
         ui.rect(0f, 0f, ui.w, ui.h, Color(0f, 0f, 0f, 0.55f))
         val bw = u * 22f; val bh = u * 5f; val x = (ui.w - bw) / 2
-        var y = ui.h * 0.62f
+        var y = ui.h * 0.66f
         ui.text("Paused", 0f, y + u * 6, Color.WHITE, Align.center, ui.big, ui.w)
         if (ui.button("Resume", x, y, bw, bh)) paused = false
+        y -= bh + u
+        // Same as after a fall: back on the route a little behind where you are.
+        if (ui.button("Reset position", x, y, bw, bh)) { respawn(); paused = false }
         y -= bh + u
         if (ui.button("Back to start of route", x, y, bw, bh)) { bike.reset(world.spawnX, world.spawnY, world.spawnHeading); chase.snap(); paused = false }
         y -= bh + u
         if (ui.button("Main menu", x, y, bw, bh)) game.toMenu()
         y -= bh + u * 2
-        ui.text("Keys: W/S throttle/front brake, A/D lean, Space rear brake, F stand, Q/E gears, C camera, M map, P auto-ride",
+        ui.text("Keys: W/S throttle/front brake, A/D lean, Space rear brake (hold at a stop to reverse), F stand, Q/E gears, C camera, M map, P auto-ride, Backspace reset",
             u * 4, y, Color.LIGHT_GRAY, Align.center, ui.font, ui.w - u * 8, true)
     }
 

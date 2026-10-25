@@ -38,6 +38,8 @@ New Hampshire's unmaintained Class VI roads.
 - **Leaning.** Lean comes from the real moment balance about the contact patches, so turning
   requires countersteering. In the default *lean assist* mode a virtual rider does the
   countersteering for the lean you ask for; *countersteer* mode gives you the bars directly.
+  Below 5 mph the bike stays upright and the bars steer directly. Above that, lean fades in by
+  10 mph and then grows with speed.
 - **Chassis.** Unsprung wheels on tyre springs, plus digressive fork and shock damping. Wheels
   envelope rocks and ledges rather than passing through them, and the contact normal pushes back
   on square edges. That is also why ruts grab the front wheel, off-camber corners push you
@@ -47,14 +49,17 @@ New Hampshire's unmaintained Class VI roads.
   each be switched off; ABS can be set to front only for off-road riding.
 - **Class VI roads** get procedural ruts with a grass crown, embedded rocks, wet and dry ledge,
   water bars, washouts on steep pitches, mud holes in low spots, and fords where they cross
-  streams. Paved back roads get frost heaves and potholes; gravel roads get washboard and loose
+  streams. Fallen trees and large rocks lie across Class VI roads (and only those), at fixed
+  spots so you can learn the line. Paved back roads get frost heaves and potholes; gravel roads get washboard and loose
   edges.
 - **Rider technique.**
   - Stand on the pegs for better absorption on rough ground.
   - Shift your weight forward or back.
   - In the air, throttle and rear brake pitch the bike, just as they do on a real bike.
+  - Hold the rear brake at a standstill with no throttle to paddle backwards with your feet.
 - **Crashes.** Lowsides, tip-overs, looping a wheelie, going over the bars, trees, casing a
-  landing, and drowning the bike in deep water.
+  landing, and drowning the bike in deep water. After a crash, or any time from the pause
+  menu with **Reset position**, you're put back on the route a few metres behind.
 
 ## Difficulty
 
@@ -79,7 +84,7 @@ aired-down tyres.
 | Weight fore / aft | Joystick up / down | R / V |
 | Throttle | GAS slider (right edge) | W / Up (Shift = gentle) |
 | Front brake | FRONT BRAKE slider | S / Down |
-| Rear brake | REAR button | Space |
+| Rear brake (hold at a stop to reverse) | REAR button | Space |
 | Stand on pegs | Stand button | F |
 | Hide / show GPS map | Hide / Map button | |
 | Gears (manual mode) | Gear buttons | Q / E |

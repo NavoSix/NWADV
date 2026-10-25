@@ -30,6 +30,11 @@ class SegmentIndex(private val lines: List<Polyline>, pads: DoubleArray, private
         for ((k, v) in tmp) grid[k] = v.toIntArray()
     }
 
+    companion object {
+        /** Hits on the same line further apart than this along it are separate sections. */
+        const val SECTION = 25.0
+    }
+
     private fun key(cx: Int, cy: Int) = (cx.toLong() shl 32) or (cy.toLong() and 0xffffffffL)
 
     /** Result of [nearestPerLine]: one entry per nearby line. */
@@ -38,8 +43,8 @@ class SegmentIndex(private val lines: List<Polyline>, pads: DoubleArray, private
     }
 
     /**
-     * For every line with a segment in the query cell, the closest point within [maxDist] of
-     * (x, y). Lateral distance is signed: positive means left of the line direction.
+     * For every line (and every separate section of a line that doubles back, like a hairpin)
+     * with a segment in the query cell, the closest point within [maxDist] of (x, y). Lateral distance is signed: positive means left of the line direction.
      * Returns the number of hits written to [out].
      */
     fun nearestPerLine(x: Double, y: Double, maxDist: Double, out: Array<Hit>): Int {
@@ -58,12 +63,15 @@ class SegmentIndex(private val lines: List<Polyline>, pads: DoubleArray, private
             if (d > maxDist) continue
             val len = sqrt(l2)
             val side = if (dx * py - dy * px >= 0) 1.0 else -1.0
+            // One hit per line *section*: the two legs of a hairpin are separate hits, so
+            // callers can blend them instead of jumping between their heights.
+            val along = line.cum[si] + len * t
             var slot = -1
-            for (k in 0 until n) if (out[k].line == li) { slot = k; break }
+            for (k in 0 until n) if (out[k].line == li && kotlin.math.abs(out[k].along - along) < SECTION) { slot = k; break }
             if (slot >= 0 && out[slot].dist <= d) continue
             if (slot < 0) { if (n == out.size) continue; slot = n++ }
             val h = out[slot]
-            h.line = li; h.dist = d; h.lateral = d * side; h.along = line.cum[si] + len * t
+            h.line = li; h.dist = d; h.lateral = d * side; h.along = along
             h.heading = kotlin.math.atan2(dy, dx)
         }
         return n

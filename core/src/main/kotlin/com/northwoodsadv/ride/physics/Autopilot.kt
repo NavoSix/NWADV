@@ -4,6 +4,7 @@ import com.northwoodsadv.ride.geo.Polyline
 import com.northwoodsadv.ride.osm.RoadKind
 import com.northwoodsadv.ride.world.Ground
 import com.northwoodsadv.ride.world.GroundSample
+import com.northwoodsadv.ride.world.Noise
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan
@@ -37,7 +38,11 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
         val curvature = 2 * sin(ang) / look
         val maxLean = atan(0.6 * bike.sampleF.surface.mu)
         val lean = atan(u * u * curvature / Motorcycle.G).coerceIn(-maxLean, maxLean)
-        input.steer = (-lean / Math.toRadians(assists.maxLeanDeg)).coerceIn(-1.0, 1.0)
+        // Same blend the bike uses: lean at speed, bars pointed directly at walking pace.
+        val direct = -atan(curvature * bike.spec.wheelbase) / bike.spec.maxSteer
+        val leaned = -lean / bike.leanAuthority(assists, u).coerceAtLeast(0.02)
+        val w = 1 - Noise.smoothstep(Motorcycle.UPRIGHT_SPEED, Motorcycle.UPRIGHT_SPEED * 2, abs(u))
+        input.steer = (leaned * (1 - w) + direct * w).coerceIn(-1.0, 1.0)
 
         // Speed: road type limit, then curvature and grip ahead with room to brake.
         var v = 30.0

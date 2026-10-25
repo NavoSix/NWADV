@@ -86,6 +86,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     private var fzTotalFilt = 0.0
     private var steerTarget = 0.0
     private var patchLoadF = 0.0; private var patchLoadR = 0.0
+    private var rearLoadMemory = 0.0
     private var compPrevF = 0.0; private var compPrevR = 0.0
     private var hubF = 0.0; private var hubR = 0.0
     private var hubVF = 0.0; private var hubVR = 0.0
@@ -109,6 +110,16 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     var airborne = false; private set
     var lastImpact = 0.0; private set
     var crash: CrashReason? = null; private set
+    /** Paddling backwards with the feet (hold the rear brake at a stop). */
+    var paddling = false; private set
+    /** Leg swing phase for the paddling animation (radians). */
+    var paddlePhase = 0.0; private set
+    private var reverseHold = 0.0
+    /** Rider has a foot (or both) down: stopped, crawling, or paddling. */
+    val feetDown get() = paddling || (abs(forwardSpeed) < 0.7 && throttleSmoothed < 0.15)
+    private fun cy0() = cos(yaw)
+    private fun sy0() = sin(yaw)
+
     /** True while a riding buddy is pushing you out of a hole. */
     var buddyPush = false; private set
     private var stuckTime = 0.0
@@ -132,6 +143,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         vx = 0.0; vy = 0.0; yawRate = 0.0; vz = 0.0; pitchRate = 0.0
         lean = 0.0; leanRate = 0.0; steer = 0.0; omegaF = 0.0; omegaR = 0.0
         gear = 1; clutchLocked = false; engineOmega = spec.idleRpm * 2 * PI / 60
+        paddling = false; reverseHold = 0.0
         tanAlphaF = 0.0; tanAlphaR = 0.0; leanErrInt = 0.0; fOtherLatLast = 0.0; steerTarget = 0.0; crash = null
         fzTotalFilt = spec.mass * G; fzFrontFilt = spec.mass * G * spec.cgToRear / spec.wheelbase
         val gf = ground.height(px + cos(heading) * spec.cgToFront, py + sin(heading) * spec.cgToFront)
@@ -186,6 +198,13 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
 
         // ---- rider: throttle smoothing, shifting, steering -----------------------------
         throttleSmoothed += (input.throttle - throttleSmoothed) * min(1.0, dt / 0.08)
+
+        // Reverse: holding the rear brake at a standstill (no throttle, no front brake) puts the
+        // rider's feet down to paddle the bike backwards.
+        val wantBack = input.rearBrake > 0.5 && input.throttle < 0.05 && input.frontBrake < 0.2
+        val uNow = vx * cy0() + vy * sy0()
+        reverseHold = if (wantBack && (abs(uNow) < 0.25 || paddling)) reverseHold + dt else 0.0
+        paddling = reverseHold > 0.4
         handleShifting(input, a, dt)
         steer = riderSteer(input, a, u, dt)
 
@@ -248,7 +267,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
 
         val nominalR0 = m * G * spec.cgToFront / spec.wheelbase
         // Front wheel (brake only).
-        var brakeF = input.frontBrake.coerceIn(0.0, 1.0) * spec.frontBrakeMax
+        var brakeF = if (paddling) 0.0 else input.frontBrake.coerceIn(0.0, 1.0) * spec.frontBrakeMax
         val denomF = max(abs(uF), 1.5)
         var kF = (omegaF * spec.frontRadius - uF) / denomF
         absActive = false
@@ -268,6 +287,11 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         patchLoadF += (fzF - patchLoadF) * kzF; patchLoadR += (fzR - patchLoadR) * kzR
         if (fzF <= 0) patchLoadF = 0.0
         if (fzR <= 0) patchLoadR = 0.0
+        // Assist: the rear patch "remembers" its load through a brief hop off a rock, so it lands
+        // still gripping instead of skating sideways (decays over ~1.5 m of travel).
+        val kzRs = 1 - exp(-dt * (abs(uR) + 1.0) / 1.5)
+        rearLoadMemory += (fzR - rearLoadMemory) * if (fzR > rearLoadMemory) kzR else kzRs
+        val rearLoad = if (a.stability > 0) max(patchLoadR, rearLoadMemory * a.stability) else patchLoadR
         Tire.forces(patchLoadF, kF, tanAlphaF, lean, spec.camberStiffness, sampleF.surface, a.grip, nominalF, tire, a.lateralGrip)
         val fxTireF = tire.fx; val fyTireF = tire.fy
         slipF = tire.utilisation
@@ -319,13 +343,13 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         // in gear makes the auto clutch let go instead).
         if (rpmNow < spec.idleRpm && !clutchLocked) engT = max(engT, (spec.idleRpm - rpmNow) * 0.15)
 
-        var brakeR = input.rearBrake.coerceIn(0.0, 1.0) * spec.rearBrakeMax
+        var brakeR = if (paddling) 0.0 else input.rearBrake.coerceIn(0.0, 1.0) * spec.rearBrakeMax
         if (a.absRear && brakeR > 0 && abs(uR) > 1.5) {
             absR = absModulate(absR, kR, sampleR.surface.slipPeak * 0.75, dt)
             brakeR *= absR
             if (absR < 0.97) absActive = true
         } else absR = 1.0
-        Tire.forces(patchLoadR, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR * a.grip, nominalR, tire, a.lateralGrip)
+        Tire.forces(rearLoad, kR, tanAlphaR, lean, spec.camberStiffness, sampleR.surface, gripR * a.grip, nominalR, tire, a.lateralGrip * (1 + 0.25 * a.stability))
         val fxTireR = tire.fx; val fyTireR = tire.fy
         slipR = tire.utilisation
 
@@ -406,8 +430,16 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val aero = 0.5 * 1.2 * cda * v
         fx -= aero * vx; fy -= aero * vy
 
-        // Low-speed foot paddling: when nearly stopped the rider's feet hold the bike.
-        val lowW = if (a.lowSpeedBalance) 1 - Noise.smoothstep(1.2, 3.5 + 1.5 * a.stability, abs(u)) else 0.0
+        // Low-speed balance: below ~5 mph the rider's feet and body hold the bike upright.
+        val lowW = if (a.lowSpeedBalance) 1 - Noise.smoothstep(UPRIGHT_SPEED * 0.9, UPRIGHT_SPEED * 2.0, abs(u)) else 0.0
+        val leanWanted = requestedLean(input, a, u)
+
+        // Paddling backwards with both feet, up to a slow walk.
+        if (paddling) {
+            val push = ((-REVERSE_SPEED - u) * 700.0).coerceIn(-500.0, 300.0)
+            fx += push * cy; fy += push * sy
+            paddlePhase += abs(u) * dt * 3.2
+        }
 
         // Buddy push (easy mode): stuck with the throttle open, a riding buddy shoves you free.
         if (a.stability >= 0.5 && throttleSmoothed > 0.25 && abs(u) < 0.6) stuckTime += dt else if (abs(u) > 1.8 || throttleSmoothed < 0.15) stuckTime = 0.0
@@ -463,21 +495,23 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val iRoll = spec.rollInertia + m * h * h
         var leanTorque = h * (fz * sin(lean) - fLat * cos(lean))
         if (standing) leanTorque *= 0.9
+        if (paddling) leanTorque += (-8000.0 * lean - 1500.0 * leanRate).coerceIn(-3000.0, 3000.0)
         if (lowW > 0) {
-            // Balance by paddling / dabbing at walking pace.
-            leanTorque += lowW * (-2600.0 * lean - 520.0 * leanRate)
+            // Balance by paddling / dabbing at walking pace: strong enough to stay upright even
+            // while turning at full lock.
+            leanTorque += lowW * (-8000.0 * (lean - leanWanted) - 1500.0 * leanRate).coerceIn(-3000.0, 3000.0)
         }
         if (airborne) leanTorque += -40.0 * leanRate
         // Body English: the rider shifts their weight over the bike to balance it. Limited by how
         // far ~90 kg can move (about 15 cm standing), so it only matters at low speed.
         val bodyMax = if (standing) 200.0 else 110.0
-        val leanGoal = if (a.steerMode == SteerMode.LEAN) -input.steer.coerceIn(-1.0, 1.0) * Math.toRadians(a.maxLeanDeg) else lean
+        val leanGoal = leanWanted
         val bodyW = 1 - Noise.smoothstep(3.0, 9.0, abs(u))
         leanTorque += bodyW * (-900.0 * (lean - leanGoal) - 260.0 * leanRate).coerceIn(-bodyMax, bodyMax)
         // Stability assist: a stabiliser holding the requested lean (lean mode) or damping lean
         // changes (countersteer mode), strongest at low speed where balancing is hardest.
         if (a.stability > 0) {
-            val goal = if (a.steerMode == SteerMode.LEAN) -input.steer.coerceIn(-1.0, 1.0) * Math.toRadians(a.maxLeanDeg) else lean
+            val goal = leanWanted
             val lowBoost = 1 + 1.5 * (1 - Noise.smoothstep(2.0, 10.0, abs(u)))
             val k = 1500.0 * a.stability * lowBoost; val c = 420.0 * a.stability * lowBoost
             val lim = 1800.0 * a.stability * lowBoost
@@ -562,7 +596,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     private fun tyreLoad(deflection: Double, rate: Double, k: Double): Double {
         if (deflection <= 0) return 0.0
         // Progressive once the carcass is squashed (pinch flat territory).
-        var f = k * deflection + 300.0 * rate
+        var f = k * deflection + spec.tyreDamping * rate
         if (deflection > 0.04) f += 2_000_000.0 * (deflection - 0.04) * (deflection - 0.04)
         return max(f, 0.0)
     }
@@ -629,10 +663,7 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val k2 = if (standing) 8.5 else 7.1
         val ay = when (a.steerMode) {
             SteerMode.LEAN -> {
-                // At low speed even full lock can't sustain much lean; a real rider wouldn't ask.
-                val ayMax = u * u * tan(spec.maxSteer) / spec.wheelbase
-                val leanCap = min(Math.toRadians(a.maxLeanDeg), atan(ayMax / G) * 0.85 + 0.03)
-                val target = -input.steer.coerceIn(-1.0, 1.0) * leanCap
+                val target = requestedLean(input, a, u)
                 val err = lean - target
                 leanErrInt = (leanErrInt + err * dt) * exp(-dt * 0.6)
                 leanErrInt = leanErrInt.coerceIn(-0.5, 0.5)
@@ -663,13 +694,38 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val flow = atan((vLat + yawRate * spec.cgToFront) / uc)
         var hs = (atan(tanAlphaNeeded) + flow) * sign(u + 1e-9)
         if (fzFrontFilt < 80) hs = steer // front in the air: bars stay put
-        // At walking pace the rider just points the bars where they want to go.
-        val lowW = 1 - Noise.smoothstep(0.8, 2.2, abs(u))
+        // At walking pace the rider just points the bars where they want to go (bike upright).
+        val lowW = 1 - Noise.smoothstep(UPRIGHT_SPEED, UPRIGHT_SPEED * 2.0, abs(u))
         val ls = -input.steer.coerceIn(-1.0, 1.0) * spec.maxSteer
         val target = (hs * (1 - lowW) + ls * lowW).coerceIn(-spec.maxSteer, spec.maxSteer)
         steerTarget = target
         val maxRate = 6.0 * dt
         return steer + (steerTarget - steer).coerceIn(-maxRate, maxRate)
+    }
+
+    /**
+     * Lean the rider is asking for. Below [UPRIGHT_SPEED] (5 mph) the bike stays upright and the
+     * bars steer directly; lean then fades in by [LEAN_IN_SPEED] (10 mph) and grows with speed,
+     * because full stick asks for the lean that full lock (tightest turn) would need, capped by
+     * the lean setting and, with assists, by the grip underneath.
+     */
+    fun requestedLean(input: RiderInput, a: Assists, u: Double): Double {
+        if (a.steerMode != SteerMode.LEAN) return lean
+        return -input.steer.coerceIn(-1.0, 1.0) * leanAuthority(a, u)
+    }
+
+    /** Lean (rad) that full stick asks for at speed [u]. */
+    fun leanAuthority(a: Assists, u: Double): Double {
+        val au = abs(u)
+        val ramp = Noise.smoothstep(UPRIGHT_SPEED, LEAN_IN_SPEED, au)
+        val ayMax = au * au * tan(spec.maxSteer) / spec.wheelbase
+        var cap = min(Math.toRadians(a.maxLeanDeg), atan(ayMax / G) * 0.85) * ramp
+        // With assists, full stick never asks for more lean than the surface under you can hold.
+        if (a.stability > 0) {
+            val gripLean = atan(0.85 * min(sampleF.surface.mu, sampleR.surface.mu) * a.grip * a.lateralGrip.coerceAtMost(1.2))
+            cap = min(cap, cap + (gripLean - cap) * a.stability)
+        }
+        return cap
     }
 
     private fun terrainPitch(gF: Double, gR: Double) = atan((gF - gR) / spec.wheelbase)
@@ -722,6 +778,12 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         const val STEP = 1.0 / 300.0
         const val RELAX_LENGTH = 0.25
         const val CLUTCH_SLIP = 12.0
+        /** 5 mph: below this the bike is held upright and steered directly. */
+        const val UPRIGHT_SPEED = 2.235
+        /** Walking pace while paddling backwards (m/s). */
+        const val REVERSE_SPEED = 1.1
+        /** 10 mph: lean has fully faded in by here (it still grows with speed after). */
+        const val LEAN_IN_SPEED = 4.47
         const val LOAD_RELAX = 0.35
     }
 }

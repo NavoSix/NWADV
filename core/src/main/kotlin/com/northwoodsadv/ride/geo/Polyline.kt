@@ -55,6 +55,30 @@ class Polyline(val xs: DoubleArray, val ys: DoubleArray) {
         return Polyline(nx, ny)
     }
 
+    /**
+     * Rounded copy: resampled every [step] m, then Chaikin corner cutting. Roads are built with
+     * curves, not kinks; sharp vertices (from GPS jitter or sparse map nodes) would otherwise
+     * make the road surface step on the inside of the bend. Endpoints are kept.
+     */
+    fun rounded(step: Double = 5.0, iterations: Int = 3): Polyline {
+        if (size < 3) return this
+        var xs = resample(step).let { it.xs }; var ys = resample(step).let { it.ys }
+        repeat(iterations) {
+            val n = xs.size
+            if (n < 3) return@repeat
+            val nx = DoubleArray(2 * (n - 1)); val ny = DoubleArray(2 * (n - 1))
+            nx[0] = xs[0]; ny[0] = ys[0]
+            var k = 1
+            for (i in 0 until n - 1) {
+                if (i > 0) { nx[k] = 0.75 * xs[i] + 0.25 * xs[i + 1]; ny[k] = 0.75 * ys[i] + 0.25 * ys[i + 1]; k++ }
+                if (i < n - 2) { nx[k] = 0.25 * xs[i] + 0.75 * xs[i + 1]; ny[k] = 0.25 * ys[i] + 0.75 * ys[i + 1]; k++ }
+            }
+            nx[k] = xs[n - 1]; ny[k] = ys[n - 1]; k++
+            xs = nx.copyOf(k); ys = ny.copyOf(k)
+        }
+        return Polyline(xs, ys).resample(step / 2)
+    }
+
     companion object {
         fun from(points: List<GeoPoint>, proj: LocalProjection): Polyline {
             val xs = DoubleArray(points.size); val ys = DoubleArray(points.size)

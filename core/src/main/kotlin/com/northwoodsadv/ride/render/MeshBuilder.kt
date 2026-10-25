@@ -124,6 +124,29 @@ class MeshBuilder(initialVerts: Int = 1024) {
         }
     }
 
+    /** Round bar (log) between two points, flat-shaded, with lighter cut ends. */
+    fun tube(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, r0: Float, r1: Float, sides: Int, color: Float, endColor: Float) {
+        val dx = x1 - x0; val dy = y1 - y0; val dz = z1 - z0
+        val len = sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(1e-5f)
+        val fx = dx / len; val fy = dy / len; val fz = dz / len
+        val (ax, ay, az) = if (kotlin.math.abs(fy) < 0.9f) Triple(0f, 1f, 0f) else Triple(1f, 0f, 0f)
+        var ux = fy * az - fz * ay; var uy = fz * ax - fx * az; var uz = fx * ay - fy * ax
+        val ul = sqrt(ux * ux + uy * uy + uz * uz); ux /= ul; uy /= ul; uz /= ul
+        val vx = fy * uz - fz * uy; val vy = fz * ux - fx * uz; val vz = fx * uy - fy * ux
+        for (i in 0 until sides) {
+            val a0 = i * TWO_PI / sides; val a1 = (i + 1) * TWO_PI / sides
+            val c0 = cos(a0); val s0 = sin(a0); val c1 = cos(a1); val s1 = sin(a1)
+            val p0x = x0 + (ux * c0 + vx * s0) * r0; val p0y = y0 + (uy * c0 + vy * s0) * r0; val p0z = z0 + (uz * c0 + vz * s0) * r0
+            val p1x = x0 + (ux * c1 + vx * s1) * r0; val p1y = y0 + (uy * c1 + vy * s1) * r0; val p1z = z0 + (uz * c1 + vz * s1) * r0
+            val q0x = x1 + (ux * c0 + vx * s0) * r1; val q0y = y1 + (uy * c0 + vy * s0) * r1; val q0z = z1 + (uz * c0 + vz * s0) * r1
+            val q1x = x1 + (ux * c1 + vx * s1) * r1; val q1y = y1 + (uy * c1 + vy * s1) * r1; val q1z = z1 + (uz * c1 + vz * s1) * r1
+            flatTri(p0x, p0y, p0z, q0x, q0y, q0z, p1x, p1y, p1z, color)
+            flatTri(p1x, p1y, p1z, q0x, q0y, q0z, q1x, q1y, q1z, color)
+            flatTri(x0, y0, z0, p1x, p1y, p1z, p0x, p0y, p0z, endColor)
+            flatTri(x1, y1, z1, q0x, q0y, q0z, q1x, q1y, q1z, endColor)
+        }
+    }
+
     /** A square-section bar between two points. */
     fun beam(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, t: Float, color: Float) {
         val dx = x1 - x0; val dy = y1 - y0; val dz = z1 - z0

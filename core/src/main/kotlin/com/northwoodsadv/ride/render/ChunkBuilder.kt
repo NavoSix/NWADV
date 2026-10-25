@@ -6,6 +6,7 @@ import com.northwoodsadv.ride.world.GroundSample
 import com.northwoodsadv.ride.world.Noise
 import com.northwoodsadv.ride.world.Obstacles
 import com.northwoodsadv.ride.world.Road
+import com.northwoodsadv.ride.world.TrailObstacles
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -133,12 +134,13 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             val s = s0 + (s1 - s0) * k / steps
             road.line.pointAt(s - 1.5, a); road.line.pointAt(s + 1.5, b)
             val hdg = atan2(b[1] - a[1], b[0] - a[0])
+            val turn = turnRadius(road, s)
             road.line.pointAt(s, a)
             val lx = -sin(hdg); val ly = cos(hdg)
             for (l in 0 until lanes) {
-                val off = -w + 2 * w * l / (lanes - 1)
+                val off = clampInside(-w + 2 * w * l / (lanes - 1), turn)
                 val e = a[0] + lx * off; val n = a[1] + ly * off
-                ground.sample(e, n, gs, d.level == 0)
+                ground.sample(e, n, gs, d.level == 0, obstacles = false)
                 val y = (gs.height - baseH + lift).toFloat()
                 m.vertex((e - d.e0).toFloat(), y, (-(n - d.n0)).toFloat(), 0f, 1f, 0f, Palette.ground(gs, e, n, d.level == 0))
             }
@@ -163,6 +165,24 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             m.tri(p, p + 1, q + 1); m.tri(p, q + 1, q)
         }
         if (d.level <= 1 && road.spec.surface.isPaved) markings(d, m, road, s0, s1, gs, a, b, lift)
+    }
+
+    /**
+     * Signed radius of the road's curve at s (positive = turning left), from the heading change
+     * over 6 m. Large when straight.
+     */
+    private fun turnRadius(road: Road, s: Double): Double {
+        val p = DoubleArray(3); road.line.pointAt(s - 3, p); val h0 = p[2]; road.line.pointAt(s + 3, p)
+        var dh = p[2] - h0
+        while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI
+        return if (abs(dh) < 1e-4) 1e9 else 6.0 / dh
+    }
+
+    /** Keeps ribbon vertices on the inside of a tight bend from folding past its centre. */
+    private fun clampInside(off: Double, radius: Double): Double {
+        if (radius > 0 && off > 0) return minOf(off, radius * 0.8)
+        if (radius < 0 && off < 0) return maxOf(off, radius * 0.8)
+        return off
     }
 
     /** Painted lines: double yellow centre on main roads, white fog lines on roads 6 m+. */
@@ -192,7 +212,7 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
                 for (side in 0..1) {
                     val off = ln[0] + if (side == 0) -ln[1] else ln[1]
                     val e = a[0] + lx * off; val n = a[1] + ly * off
-                    ground.sample(e, n, gs, d.level == 0)
+                    ground.sample(e, n, gs, d.level == 0, obstacles = false)
                     val v = m.vertex((e - d.e0).toFloat(), (gs.height - baseH + lift + 0.012).toFloat(), (-(n - d.n0)).toFloat(), 0f, 1f, 0f, col)
                     if (side == 0) vl = v else vr = v
                 }
@@ -238,7 +258,54 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
                     Palette.shade(0x8a8a82, 0.85 + Noise.rand(bo.x.toInt(), bo.y.toInt(), 3) * 0.3), bo.x.toFloat())
             }
         }
+        trailObstacles(d, m)
         if (m.vertCount > 0) d.trees = m
+    }
+
+    /** Logs and rocks on Class VI roads whose position falls inside this chunk. */
+    internal fun trailObstacles(d: ChunkData, m: MeshBuilder) {
+        val o = TrailObstacles.Obstacle()
+        val p = DoubleArray(3)
+        val bark = Palette.shade(0x7a6248, 1.0); val cut = Palette.shade(0xd8b888, 1.0)
+        for ((ri, road) in ground.roads.withIndex()) {
+            if (!road.spec.isClassVI) continue
+            val bb = roadBoxes[ri]
+            if (bb[2] < d.e0 - 20 || bb[0] > d.e0 + d.size + 20 || bb[3] < d.n0 - 20 || bb[1] > d.n0 + d.size + 20) continue
+            val slots = (road.line.length / TrailObstacles.SLOT).toInt() + 1
+            for (k in 0..slots) {
+                if (!TrailObstacles.obstacle(road, k, o)) continue
+                road.line.pointAt(o.s, p)
+                val hd = p[2]
+                val fx = kotlin.math.cos(hd); val fy = kotlin.math.sin(hd)  // along road
+                val lx = -fy; val ly = fx                                        // left
+                val cx = p[0] + lx * o.lat; val cy = p[1] + ly * o.lat
+                if (cx < d.e0 || cx >= d.e0 + d.size || cy < d.n0 || cy >= d.n0 + d.size) continue
+                if (o.log) {
+                    // Axis: mostly across the road, angled by o.angle.
+                    val sa = kotlin.math.sin(o.angle); val ca = kotlin.math.cos(o.angle)
+                    val axX = fx * sa + lx * ca; val axY = fy * sa + ly * ca
+                    val half = o.length / 2
+                    val ax0 = cx - axX * half; val ay0 = cy - axY * half
+                    val ax1 = cx + axX * half; val ay1 = cy + axY * half
+                    val r0 = o.r; val r1 = o.r * 0.65
+                    val h0 = ground.height(ax0, ay0, false) - baseH + r0
+                    val h1 = ground.height(ax1, ay1, false) - baseH + r1
+                    m.tube((ax0 - d.e0).toFloat(), h0.toFloat(), (-(ay0 - d.n0)).toFloat(),
+                        (ax1 - d.e0).toFloat(), h1.toFloat(), (-(ay1 - d.n0)).toFloat(), r0.toFloat(), r1.toFloat(), 7, bark, cut)
+                    // A couple of snapped-off branch stubs.
+                    for (b in listOf(0.3, 0.62)) {
+                        val bx = ax0 + (ax1 - ax0) * b; val by = ay0 + (ay1 - ay0) * b
+                        val bh = h0 + (h1 - h0) * b
+                        m.beam((bx - d.e0).toFloat(), bh.toFloat(), (-(by - d.n0)).toFloat(),
+                            (bx - d.e0 + fx * 0.5).toFloat(), (bh + 0.45).toFloat(), (-(by - d.n0 + fy * 0.5)).toFloat(), 0.03f, bark)
+                    }
+                } else {
+                    val gy = ground.height(cx, cy, false) - baseH
+                    m.blob((cx - d.e0).toFloat(), gy.toFloat(), (-(cy - d.n0)).toFloat(), o.r.toFloat(), o.h.toFloat(), (o.r * 0.9).toFloat(),
+                        Palette.shade(0x84847c, 0.9 + 0.2 * Noise.rand(k, ri, 5)), o.s.toFloat())
+                }
+            }
+        }
     }
 
     private fun leafColor(t: Double): Float = when (season) {

@@ -45,6 +45,7 @@ class Dashboard(private val settings: Settings) {
         if (bike.scraping) tags += "PEGS" to Color.RED
         if (bike.airborne) tags += "AIR" to Color.CYAN
         if (bike.buddyPush) tags += "PUSH!" to Color.YELLOW
+        if (bike.paddling) tags += "REVERSE" to Color.YELLOW
         if (bike.slipR > 1.05 || bike.slipF > 1.05) tags += "SLIDE" to Color.ORANGE
         var lx = tx
         for ((t, c) in tags) { ui.text(t, lx, r2, c); lx += ui.textWidth(t) + u * 1.0f }

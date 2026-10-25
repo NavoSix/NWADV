@@ -38,7 +38,7 @@ class EngineSound(
         /** Big air-cooled single: one deep thump every other revolution. */
         val SINGLE = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005)
         /** Donovan's Himalayan 411, recorded holding idle, 1,900, 2,850, 4,000 and 4,800 rpm. */
-        val HIMALAYAN_411 = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005, "sounds/himalayan411.grains", throat = 1.0, pops = 1.0)
+        val HIMALAYAN_411 = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005, "sounds/himalayan411.grains", throat = 0.65, pops = 1.0)
     }
 }
 
@@ -298,7 +298,7 @@ class RideSynth(private val rate: Int) {
                     bodyLp += (s - bodyLp) * 0.35
                     s = bodyLp + (s - bodyLp) * (1 - 0.3 * throat)
                     val drive = 1 + 0.8 * throat
-                    s = kotlin.math.tanh(s * drive) / drive * THROAT_TRIM
+                    s = kotlin.math.tanh(s * drive) / drive * (1 - THROAT_TRIM * throat)
                 }
                 // Wind.
                 val n = rnd.nextDouble() * 2 - 1
@@ -328,7 +328,7 @@ class RideSynth(private val rate: Int) {
     companion object {
         /** Recorded engine level in the mix (the recordings peak near 0.9). */
         const val GRAIN_LEVEL = 1.1
-        /** Keeps the overall level about the same once the resonances are added. */
-        const val THROAT_TRIM = 0.72
+        /** Level taken back per unit of throat, so adding resonance doesn't just make it louder. */
+        const val THROAT_TRIM = 0.28
     }
 }

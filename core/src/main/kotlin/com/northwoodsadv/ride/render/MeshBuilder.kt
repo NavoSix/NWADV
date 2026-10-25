@@ -195,10 +195,11 @@ class MeshBuilder(initialVerts: Int = 1024) {
      * Spoked dual-sport wheel around the Z axis at the origin: knobby tyre of outer radius [r]
      * and section height [tyreH], rim, [spokes] crossed spokes and a hub.
      */
-    fun spokedWheel(r: Float, tyreH: Float, halfW: Float, spokes: Int, tyre: Float, knob: Float, rim: Float, spoke: Float, hub: Float) {
-        arc(0f, 0f, r - tyreH / 2 - 0.004f, 0f, TWO_PI, halfW, tyreH - 0.008f, tyre, 24)
+    fun spokedWheel(r: Float, tyreH: Float, halfW: Float, spokes: Int, tyre: Float, knob: Float, rim: Float, spoke: Float, hub: Float, knobs: Int = 26) {
+        val segs = if (knobs > 24) 32 else 18
+        arc(0f, 0f, r - tyreH / 2 - 0.004f, 0f, TWO_PI, halfW, tyreH - 0.008f, tyre, segs)
         // Knobs in two staggered rows plus a centre row.
-        val n = 26
+        val n = knobs
         for (k in 0 until n) {
             val a = k * TWO_PI / n
             val zOff = if (k % 2 == 0) halfW * 0.5f else -halfW * 0.5f
@@ -206,7 +207,7 @@ class MeshBuilder(initialVerts: Int = 1024) {
             if (k % 2 == 1) arc(0f, 0f, r - 0.006f, a + 0.12f, a + 0.2f, halfW * 0.22f, 0.014f, knob, 1, 0f)
         }
         val rimR = r - tyreH - 0.008f
-        arc(0f, 0f, rimR, 0f, TWO_PI, 0.02f, 0.022f, rim, 24)
+        arc(0f, 0f, rimR, 0f, TWO_PI, 0.02f, 0.022f, rim, segs)
         for (k in 0 until spokes) {
             val a = k * TWO_PI / spokes
             val side = if (k % 2 == 0) 1f else -1f
@@ -214,7 +215,7 @@ class MeshBuilder(initialVerts: Int = 1024) {
             val ha = a + side * 0.5f
             beam(cos(ha) * 0.045f, sin(ha) * 0.045f, side * 0.045f, cos(a) * (rimR - 0.012f), sin(a) * (rimR - 0.012f), side * 0.008f, 0.0028f, spoke)
         }
-        tube(0f, 0f, -0.065f, 0f, 0f, 0.065f, 0.042f, 0.042f, 10, hub, hub)
+        tube(0f, 0f, -0.065f, 0f, 0f, 0.065f, 0.042f, 0.042f, if (knobs > 24) 14 else 8, hub, hub)
     }
 
     /** Axis-aligned box centred at (x, y, z). */

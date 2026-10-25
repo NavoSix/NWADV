@@ -61,7 +61,7 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
             if (col == 2) { col = 0; sy -= sh + u * 0.8f }
         }
         // Bike: opens the garage.
-        val bikeName = com.northwoodsadv.ride.bikes.Bikes.byId(s.bikeId).name
+        val bikeName = com.northwoodsadv.ride.bikes.Bikes.byId(s.bikeId).shortDisplayName
         val bh2 = sh * 0.75f
         if (ui.button("Bike: $bikeName", sx, sy + sh - bh2, sw, bh2)) { game.setScreen(BikeSelectScreen(game)); ui.endFrame(); return }
         sy -= bh2 + u * 0.8f

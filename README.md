@@ -76,10 +76,12 @@ New Hampshire's unmaintained Class VI roads.
 ## Bikes
 
 Pick a bike in the **Garage** (main menu, *Bike*). Each one has its own physics, engine sound
-and 3D model, and the garage shows it on a turntable you can spin with a drag. Club members'
+and 3D model, and the garage shows it on a turntable you can spin with a drag. Bikes carry their
+owner's name; the garage model is finely detailed (cables, bolts, chain links, gauge needles),
+while a lighter version of the same model is used on the road. Club members'
 bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
 
-- **Royal Enfield Himalayan 411**, modelled on a club member's bike as set up:
+- **Donovan's Royal Enfield Himalayan 411**, modelled on the real bike as Donovan has it set up:
   - Rock Red, with a tall screen, phone mount, Tusk handguards, crash bars, tank guards, skid
     plate, pannier frames and rear rack.
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.

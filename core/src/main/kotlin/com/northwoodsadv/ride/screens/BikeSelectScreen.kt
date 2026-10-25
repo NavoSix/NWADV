@@ -14,6 +14,7 @@ import com.northwoodsadv.ride.bikes.BikeModel
 import com.northwoodsadv.ride.bikes.Bikes
 import com.northwoodsadv.ride.render.BikeRenderer
 import com.northwoodsadv.ride.render.ChunkManager
+import com.northwoodsadv.ride.render.Detail
 import com.northwoodsadv.ride.render.MeshBuilder
 import com.northwoodsadv.ride.render.Palette
 import com.northwoodsadv.ride.render.WorldShader
@@ -49,7 +50,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         }
     }
 
-    private fun renderer(b: BikeModel) = renderers.getOrPut(b.id) { BikeRenderer(b.spec, b.look()) }
+    private fun renderer(b: BikeModel) = renderers.getOrPut(b.id) { BikeRenderer(b.spec, b.look(Detail.SHOWROOM)) }
 
     override fun render(delta: Float) {
         val ui = game.ui
@@ -124,7 +125,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         val lh = u * 6.2f
         var ly = ui.h - u * 17f
         for ((i, b) in Bikes.all.withIndex()) {
-            if (ui.button("${b.name}\n${b.owner}", u * 3, ly, lw, lh, active = i == selected)) selected = i
+            if (ui.button(b.listLabel, u * 3, ly, lw, lh, active = i == selected)) selected = i
             ly -= lh + u
         }
 
@@ -137,7 +138,8 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         val lines = listOf(
             "Engine" to bike.engine,
             "Output" to bike.power,
-            "Gears" to "${s.gearRatios.size}-speed, redline %,d".format(s.redlineRpm.toInt()),
+            "Gears" to "${s.gearRatios.size}-speed",
+            "Redline" to "%,d rpm".format(s.redlineRpm.toInt()),
             "Weight" to "${mass(s.massBike)} as set up",
             "Travel" to "${len(s.frontTravel * 1000)} / ${len(s.rearTravel * 1000)}",
             "Wheels" to "%.0f\" / %.0f\"".format(wheelInches(s.frontRadius, true), wheelInches(s.rearRadius, false)),
@@ -146,7 +148,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         for ((k, v) in lines) {
             ui.text(k, px, ty, Color.GRAY)
             ui.text(v, px + pw * 0.16f, ty, Color.LIGHT_GRAY)
-            ty -= u * 2.6f
+            ty -= u * 2.3f
         }
         ui.text(bike.blurb, px + pw * 0.54f, py - u * 1.5f, Color(0.8f, 0.8f, 0.7f, 1f), Align.left, ui.font, pw * 0.46f, true)
         ui.text("Drag to turn", px + u, py + u * 2.5f, Color(1f, 1f, 1f, 0.6f))

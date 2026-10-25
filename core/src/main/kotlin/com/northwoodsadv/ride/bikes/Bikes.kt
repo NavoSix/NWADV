@@ -3,6 +3,7 @@ package com.northwoodsadv.ride.bikes
 import com.northwoodsadv.ride.audio.EngineSound
 import com.northwoodsadv.ride.physics.BikeSpec
 import com.northwoodsadv.ride.render.BikeLook
+import com.northwoodsadv.ride.render.Detail
 import com.northwoodsadv.ride.render.GenericTwinLook
 import com.northwoodsadv.ride.render.HimalayanLook
 
@@ -12,17 +13,29 @@ import com.northwoodsadv.ride.render.HimalayanLook
  */
 class BikeModel(
     val id: String,
+    /** Make and model, e.g. "Royal Enfield Himalayan 411". */
     val name: String,
-    /** Whose bike it is (shown on the selection screen). */
-    val owner: String,
+    /** The club member whose bike this is, or null for a club loaner. */
+    val owner: String?,
     val blurb: String,
     val spec: BikeSpec,
     val sound: EngineSound,
-    val look: () -> BikeLook,
+    /** The 3D model at a level of detail (finely detailed in the garage, lighter on the road). */
+    val look: (Detail) -> BikeLook,
     /** Headline numbers for the selection screen. */
     val engine: String,
     val power: String,
-)
+    /** Short model name for tight spots (e.g. "Himalayan 411"). */
+    val shortName: String = name,
+) {
+    /** "Donovan's Royal Enfield Himalayan 411", or the plain model name for a loaner. */
+    val displayName get() = if (owner != null) "$owner's $name" else name
+    val ownerLabel get() = if (owner != null) "Owned by $owner" else "Club loaner"
+    /** "Donovan's Himalayan 411". */
+    val shortDisplayName get() = if (owner != null) "$owner's $shortName" else shortName
+    /** Two lines for list buttons: "Donovan's" / model, or model / "Club loaner". */
+    val listLabel get() = if (owner != null) "$owner's\n$name" else "$name\n$ownerLabel"
+}
 
 object Bikes {
     /**
@@ -34,7 +47,7 @@ object Bikes {
     val HIMALAYAN_411 = BikeModel(
         id = "himalayan411",
         name = "Royal Enfield Himalayan 411",
-        owner = "Your bike",
+        owner = "Donovan",
         blurb = "Rock Red, tall screen, Tusk handguards, crash bars, tank guards and racks. A torquey single that thumps up anything slowly.",
         spec = BikeSpec(
             name = "Royal Enfield Himalayan 411",
@@ -78,16 +91,17 @@ object Bikes {
             groundClearanceLean = Math.toRadians(45.0),
         ),
         sound = EngineSound.SINGLE,
-        look = { HimalayanLook() },
+        look = { HimalayanLook(it) },
         engine = "411 cc single",
         power = "24 hp / 32 N m",
+        shortName = "Himalayan 411",
     )
 
     /** The original stand-in: a generic 100 hp mid-weight adventure twin. */
     val GENERIC_TWIN = BikeModel(
         id = "generic-twin",
         name = "Mid-weight ADV twin",
-        owner = "Loaner",
+        owner = null,
         blurb = "A generic 100 hp parallel twin with long-travel suspension and aluminium panniers.",
         spec = BikeSpec(),
         sound = EngineSound.TWIN_270,

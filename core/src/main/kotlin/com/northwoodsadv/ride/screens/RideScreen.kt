@@ -41,7 +41,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val shader = WorldShader.create()
     private val baseH = world.ground.height(world.spawnX, world.spawnY, false)
     private val chunks = ChunkManager(ChunkBuilder(world.ground, baseH, settings.season), if (Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Desktop) 3 else 2)
-    private val bikeRenderer = BikeRenderer(spec, model.look())
+    private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE))
     private val cam = PerspectiveCamera(62f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     private val chase = ChaseCamera(cam).apply { mode = settings.camera }
     private val gps = GpsUnit(world, tracker, settings)

@@ -21,6 +21,8 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     override val headX = 0.43f
     override val headY = 0.95f
     override val rakeDeg = 26.5
+    override val pivotX = -0.06f
+    override val pivotY = 0.38f
     override val rider = RiderFit(-0.20f, 0.87f, 0.0f, 0.30f, 0.39f, 1.07f, 0.34f)
     // The phone in its Quad Lock mount above the gauges (landscape, upright, frame-mounted):
     // the lit display just in front of the phone body.
@@ -91,12 +93,9 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             m.beam(-0.05f, 0.77f, s * 0.09f, -0.68f, 0.83f, s * 0.10f, t * 0.85f, frame)  // subframe
             m.beam(-0.05f, 0.44f, s * 0.10f, -0.52f, 0.81f, s * 0.10f, t * 0.85f, frame)
             m.box(-0.06f, 0.39f, s * 0.112f, 0.055f, 0.065f, 0.006f, frame)               // pivot plates
-            // Swingarm (box section).
-            m.beam(-0.06f, 0.38f, s * 0.10f, -b, rr, s * 0.10f, 0.026f, frame)
-            m.box(-b, rr, s * 0.10f, 0.03f, 0.022f, 0.012f, frame)                          // axle adjusters
         }
         m.beam(-0.06f, 0.38f, -0.125f, -0.06f, 0.38f, 0.125f, 0.018f, silver)              // pivot bolt
-        m.beam(-b + 0.12f, rr + 0.02f, -0.10f, -b + 0.12f, rr + 0.02f, 0.10f, 0.018f, frame) // swingarm brace
+        m.discZ(0.0f, 0.36f, -0.123f, -0.108f, 0.045f, chain)                                  // front sprocket
 
         // --- engine: 411 cc air/oil-cooled single -------------------------------------------
         // Crankcase and gearbox from the down tubes back to the swingarm pivot.
@@ -331,6 +330,15 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.box(-0.89f, 0.855f, 0f, 0.035f, 0.03f, 0.075f, tail)                             // tail light
         m.box(-1.005f, 0.60f, 0f, 0.004f, 0.055f, 0.09f, plate)                            // NH plate
         m.box(-1.009f, 0.60f, 0f, 0.002f, 0.018f, 0.06f, MeshBuilder.color(0x2a7a4a))
+    }
+
+    override fun swingarm(m: MeshBuilder, spec: BikeSpec) {
+        val b = spec.cgToRear.toFloat(); val rr = spec.rearRadius.toFloat()
+        for (s in listOf(-1f, 1f)) {
+            m.beam(pivotX, pivotY, s * 0.10f, -b, rr, s * 0.10f, 0.026f, frame)            // box-section arms
+            m.box(-b, rr, s * 0.10f, 0.03f, 0.022f, 0.012f, frame)                          // axle adjusters
+        }
+        m.beam(-b + 0.12f, rr + 0.02f, -0.10f, -b + 0.12f, rr + 0.02f, 0.10f, 0.018f, frame) // brace
 
         // --- chain (left) and guard ---------------------------------------------------------------
         val z = -0.115f
@@ -346,7 +354,6 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             } else m.beam(rn[0], rn[1], z, rn[2], rn[3], z, 0.006f, chain)
         }
         m.beam(-0.02f, 0.44f, z - 0.012f, -b + 0.12f, rr + 0.13f, z - 0.012f, 0.012f, frame)  // chain guard
-        m.discZ(0.0f, 0.36f, -0.123f, -0.108f, 0.045f, chain)                                  // front sprocket
     }
 
     override fun glass(m: MeshBuilder, spec: BikeSpec) {

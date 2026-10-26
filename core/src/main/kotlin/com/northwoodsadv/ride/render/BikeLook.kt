@@ -33,7 +33,8 @@ class NavScreen(
  * the ground below the centre of mass at static sag; front axle at (cgToFront, frontRadius),
  * rear axle at (-cgToRear, rearRadius).
  *
- * Parts are split by how they move: the chassis (frame-mounted), the front end that steers
+ * Parts are split by how they move: the chassis (frame-mounted), the swingarm (pivots with the
+ * rear suspension), the front end that steers
  * (built in steering-head space, origin at the top of the head), the fork lowers that also slide
  * with the suspension (built around the front axle), and the wheels (which also spin).
  */
@@ -46,7 +47,13 @@ interface BikeLook {
     /** Where the moving map goes in the helmet view, or null to keep it on the HUD. */
     val navScreen: NavScreen? get() = null
 
+    /** Swingarm pivot (model space); the swingarm and rear wheel swing about it together. */
+    val pivotX: Float
+    val pivotY: Float
+
     fun chassis(m: MeshBuilder, spec: BikeSpec)
+    /** Parts that swing with the rear wheel (swingarm, chain, guard), in model space at static sag. */
+    fun swingarm(m: MeshBuilder, spec: BikeSpec) {}
     /** Translucent frame-mounted parts (windscreen), drawn blended. */
     fun glass(m: MeshBuilder, spec: BikeSpec) {}
     /** Steering parts in head space; (ax, ay) is the front axle in head space at static sag. */
@@ -61,6 +68,8 @@ class GenericTwinLook : BikeLook {
     override val headX = 0.52f
     override val headY = 1.0f
     override val rakeDeg = 27.0
+    override val pivotX = -0.02f
+    override val pivotY = 0.42f
     override val rider = RiderFit(-0.28f, 0.98f, -0.03f, 0.40f, 0.42f, 1.12f, 0.36f)
     // A portrait handlebar GPS on the crossbar, tilted back toward the rider.
     override val navScreen = NavScreen(-0.03f, 0.20f, 0f, 0.072f, 0.108f, tiltDeg = 25f, onBars = true)
@@ -80,10 +89,14 @@ class GenericTwinLook : BikeLook {
         m.box(-0.55f, 0.66f, 0.33f, 0.24f, 0.17f, 0.085f, alu)              // panniers
         m.box(-0.55f, 0.66f, -0.33f, 0.24f, 0.17f, 0.085f, alu)
         m.beam(0.48f, 0.95f, 0f, -0.05f, 0.62f, 0f, 0.05f, dark)            // frame spine
-        m.beam(-0.02f, 0.42f, 0.09f, -b, rr, 0.09f, 0.035f, grey)            // swingarm
-        m.beam(-0.02f, 0.42f, -0.09f, -b, rr, -0.09f, 0.035f, grey)
         m.beam(-0.10f, 0.55f, 0f, -0.45f, 0.90f, 0f, 0.04f, dark)           // subframe
         m.box(0.20f, 0.30f, 0f, 0.22f, 0.03f, 0.13f, grey)                  // bash plate
+    }
+
+    override fun swingarm(m: MeshBuilder, spec: BikeSpec) {
+        val b = spec.cgToRear.toFloat(); val rr = spec.rearRadius.toFloat()
+        m.beam(pivotX, pivotY, 0.09f, -b, rr, 0.09f, 0.035f, grey)
+        m.beam(pivotX, pivotY, -0.09f, -b, rr, -0.09f, 0.035f, grey)
     }
 
     override fun front(m: MeshBuilder, spec: BikeSpec, ax: Float, ay: Float) {

@@ -9,6 +9,9 @@ import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
 import com.northwoodsadv.ride.physics.BikeSpec
 import com.northwoodsadv.ride.physics.Motorcycle
+import kotlin.math.PI
+import kotlin.math.asin
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -30,6 +33,7 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
     private val glass: Mesh?
     private val wheelF: Mesh
     private val wheelR: Mesh
+    private val swingarm: Mesh?
     private val shadow: Mesh
 
     private val headX = look.headX; private val headY = look.headY
@@ -101,6 +105,9 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
             return toMesh(w)
         }
         wheelF = wheel(true); wheelR = wheel(false)
+        val am = MeshBuilder(2048)
+        look.swingarm(am, spec)
+        swingarm = if (am.vertCount > 0) toMesh(am) else null
 
         val sm = MeshBuilder(64)
         // Soft contact shadow: dark in the middle, fading to nothing at the rim (drawn blended).
@@ -257,9 +264,21 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
             Pose.NO_RIDER -> chassisBare.render(shader, GL20.GL_TRIANGLES)
         }
 
-        // Rear wheel moves up with the shock.
+        // Swingarm and rear wheel pivot together: the arm turns about its pivot until the axle
+        // has risen by the shock's travel past static sag.
         val b = spec.cgToRear.toFloat(); val rr = spec.rearRadius.toFloat()
-        m.set(base).translate(-b, rr + (compR - sagR).coerceIn(-0.05f, 0.3f), 0f).rotateRad(0f, 0f, 1f, -angR)
+        val px = look.pivotX; val py = look.pivotY
+        val armX = -b - px; val armY = rr - py
+        val armLen = sqrt(armX * armX + armY * armY)
+        val rise = (compR - sagR).coerceIn(-0.05f, 0.3f)
+        val swing0 = atan2(armY, armX)
+        val swingA = (PI.toFloat() - asin(((armY + rise) / armLen).coerceIn(-0.95f, 0.95f))) - swing0
+        m.set(base).translate(px, py, 0f).rotateRad(0f, 0f, 1f, swingA).translate(-px, -py, 0f)
+        if (swingarm != null) {
+            shader.setUniformMatrix("u_model", m)
+            swingarm.render(shader, GL20.GL_TRIANGLES)
+        }
+        m.translate(-b, rr, 0f).rotateRad(0f, 0f, 1f, -angR - swingA)
         shader.setUniformMatrix("u_model", m)
         wheelR.render(shader, GL20.GL_TRIANGLES)
 
@@ -294,6 +313,6 @@ class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = Gene
 
     override fun dispose() {
         chassisSeated.dispose(); chassisStanding.dispose(); chassisNoLegs.dispose(); chassisBare.dispose(); legL.dispose(); legR.dispose()
-        front.dispose(); frontLower?.dispose(); glass?.dispose(); wheelF.dispose(); wheelR.dispose(); shadow.dispose()
+        front.dispose(); frontLower?.dispose(); glass?.dispose(); wheelF.dispose(); wheelR.dispose(); swingarm?.dispose(); shadow.dispose()
     }
 }

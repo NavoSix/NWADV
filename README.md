@@ -25,7 +25,39 @@ New Hampshire's unmaintained Class VI roads.
 - **Woods.** In stretches of back road and Class VI the canopy closes overhead: roadside trees
   lean out over the road and the light under them is dappled shade.
 - **Unmapped sections.** Any part of your GPX that isn't on a mapped road is ridden as an
-  unmaintained trail.
+  unmaintained trail. Short stretches where the track just cuts a junction corner are ignored.
+
+**Along the road** (`world/SceneryBuilder.kt`, drawn by `render/SceneryMesh.kt`)
+- **Intersections.** The junctions where mapped roads meet are found from the map, so the real
+  intersections a route passes through look like themselves.
+  - Lesser roads get a stop sign and a painted stop line, and the lines on the road break where
+    another road comes in.
+  - Green street-name blades show both road names ("BEAR NOTCH RD").
+  - The GPS names the road you turn onto ("Left onto Bear Notch Road"). Where the route changes
+    road at a junction without much of a bend, the GPS tells you too ("Continue onto ...").
+- **Buildings.** Real OpenStreetMap building footprints along the route, each with a lawn
+  cleared from the woods and a driveway and mailbox: houses in New England colours, red barns
+  (some with gambrel roofs), silos, sheds, white steepled churches, and stores with their name
+  across the front.
+  - Where the map has no buildings, houses and farms are placed where the side roads say people
+    live. Farms come with a farmhouse, barn, silo, hay bales, a board or rail fence along the
+    road, and a stone wall at the back of the field.
+- **Roadside.**
+  - Guard rails on high fills and over water, and railings on bridges.
+  - Stone walls and fences where fields meet the road, and old stone walls running through the
+    woods along back roads.
+  - Speed limit signs, curve warnings before tight bends, and "Brake for Moose" signs on the
+    main roads.
+  - All of this stays off Class VI roads and trails.
+- **Landmarks.** Each one is named on the GPS map, and a card names it as you ride past.
+  - Viewpoints, with the view cleared below them and a "Scenic view" sign.
+  - Named boulders and other big glacial erratics in the woods.
+  - Churches, monuments, New Hampshire historical markers, fire towers, waterfalls and other
+    attractions.
+  - Covered bridges (`bridge=covered`), housed in barn-red walls and a roof you ride through.
+  - Peaks on the map, and any waypoints in your GPX file (the club's lunch stop, a gas
+    station), with a brown sign by the road.
+- **Solid.** Buildings, silos, towers and big boulders stop the bike, just as trees do.
 - **Offline after first load.** Everything downloaded is cached, so a ride works without a
   connection the next time.
 
@@ -35,8 +67,9 @@ New Hampshire's unmaintained Class VI roads.
   a file manager with *Open with* or *Share*.
 - **GPS display.** A track-up moving map with your route in magenta, roads styled by type (Class
   VI dashed brown), and your breadcrumb trail.
-- **Directions and data.** Next-turn distance, an off-route warning, distance remaining,
-  elevation, heading and odometer.
+- **Directions and data.** Next turn and its distance (with the road name at real
+  intersections), an off-route warning, distance remaining, elevation, heading and odometer.
+  Landmarks show on the map.
 
 **Physics** (`core/src/main/kotlin/.../physics`)
 - **Tyres.** A combined-slip model with a friction circle, so braking or wheelspin eats cornering
@@ -69,7 +102,7 @@ New Hampshire's unmaintained Class VI roads.
 - **Sound.** The engine, wind and tyres are synthesised from the physics. The tyres sound
   different on each surface (gravel crunch, rock knocks, mud, splashing water) without harsh
   static.
-- **Crashes.** Lowsides, tip-overs, looping a wheelie, going over the bars, trees, casing a
+- **Crashes.** Lowsides, tip-overs, looping a wheelie, going over the bars, trees, buildings and boulders, casing a
   landing, and drowning the bike in deep water. After a crash, or any time from the pause
   menu with **Reset position**, you're put back on the route a few metres behind.
 
@@ -156,6 +189,9 @@ nwadv-android*). To build locally you need JDK 17+ and the Android SDK:
     ./gradlew :android:assembleDebug     # APK in android/build/outputs/apk/debug
     ./gradlew :desktop:run --args="path/to/ride.gpx"   # desktop version for development
 
+Desktop development flags include `--osm-file <saved Overpass JSON>` (use a saved map
+download instead of the network) and `--dump-scenery` (print what was placed along the route).
+
 The Android module is only included when an Android SDK is found, so the game code can still be
 built and tested without one.
 
@@ -169,6 +205,6 @@ built and tested without one.
 
 ## Data sources
 
-- Roads, water and land cover: (c) OpenStreetMap contributors, ODbL. Downloaded at runtime
-  through the Overpass API.
+- Roads, water, land cover, buildings and landmarks: (c) OpenStreetMap contributors, ODbL.
+  Downloaded at runtime through the Overpass API.
 - Elevation: USGS 3D Elevation Program, via the AWS Terrain Tiles open dataset.

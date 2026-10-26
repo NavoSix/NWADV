@@ -125,6 +125,21 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
             if (abs(crumbX[i1] - bx) > reach) continue
             sh.rectLine(sx(crumbX[i0], crumbY[i0]), sy(crumbX[i0], crumbY[i0]), sx(crumbX[i1], crumbY[i1]), sy(crumbX[i1], crumbY[i1]), ui.u * 0.25f)
         }
+        // Landmarks: a small marker each, named once the shapes are done.
+        val labels = ArrayList<Triple<Float, Float, String>>()
+        for (l in world.ground.scenery.landmarks) {
+            val lx = l.x.toFloat(); val ly = l.y.toFloat()
+            if (abs(lx - bx) > reach || abs(ly - by) > reach) continue
+            val px = sx(lx, ly); val py = sy(lx, ly)
+            if (px < x || px > x + w || py < mapY || py > mapY + mapH) continue
+            val r = ui.u * 0.55f
+            sh.color = Color.WHITE
+            sh.rect(px - r - ui.u * 0.15f, py - r - ui.u * 0.15f, (r + ui.u * 0.15f) * 2, (r + ui.u * 0.15f) * 2)
+            sh.color = if (l.kind == "Peak") PEAK else POI
+            if (l.kind == "Peak") sh.triangle(px - r, py - r, px + r, py - r, px, py + r) else sh.rect(px - r, py - r, r * 2, r * 2)
+            if (zoom <= 1300) labels += Triple(px, py, l.name)
+        }
+
         // Position arrow.
         val a = ui.u * 1.4f
         sh.color = Color.BLACK
@@ -133,6 +148,7 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         sh.triangle(cxs, cys + a, cxs - a * 0.65f, cys - a * 0.6f, cxs, cys - a * 0.25f)
         sh.triangle(cxs, cys + a, cxs, cys - a * 0.25f, cxs + a * 0.65f, cys - a * 0.6f)
         sh.end()
+        for ((px, py, name) in labels) ui.text(name, px + ui.u * 1.1f, py + ui.u * 0.6f, POI_TEXT)
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST)
 
         // North pointer and scale.
@@ -155,7 +171,7 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
             }
             t != null -> {
                 ui.rect(x, mapY + mapH - bannerH, w, bannerH, BANNER)
-                val arrow = when { abs(t.angleDeg) > 135 -> "U"; t.left -> "<"; else -> ">" }
+                val arrow = when { abs(t.angleDeg) > 135 -> "U"; abs(t.angleDeg) <= 22 -> "^"; t.left -> "<"; else -> ">" }
                 ui.text("$arrow  ${t.label}  ${settings.distance(t.along - tracker.along)}", x + ui.u, mapY + mapH - ui.u * 1.0f, Color.WHITE)
             }
         }
@@ -188,7 +204,7 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         val (msg, col) = when {
             tracker.isOffRoute -> "Off route ${settings.distance(tracker.offRoute)}" to OFF_ROUTE
             tracker.finished -> "Ride complete!" to BANNER
-            t != null -> "${if (abs(t.angleDeg) > 135) "U" else if (t.left) "<" else ">"} ${t.label} ${settings.distance(t.along - tracker.along)}" to BANNER
+            t != null -> "${if (abs(t.angleDeg) > 135) "U" else if (abs(t.angleDeg) <= 22) "^" else if (t.left) "<" else ">"} ${t.label} ${settings.distance(t.along - tracker.along)}" to BANNER
             else -> "Follow the route" to BANNER
         }
         ui.rect(x + ui.u * 0.3f, y + row + ui.u * 0.3f, w - ui.u * 0.6f, row, col)
@@ -227,6 +243,9 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         private val FIELDS_BG = Color(0.12f, 0.13f, 0.15f, 1f)
         private val LABEL = Color(0.65f, 0.7f, 0.75f, 1f)
         private val ROUTE = Color(0.85f, 0.1f, 0.75f, 0.9f)
+        private val POI = Color(0.45f, 0.28f, 0.12f, 1f)
+        private val PEAK = Color(0.35f, 0.3f, 0.25f, 1f)
+        private val POI_TEXT = Color(0.3f, 0.2f, 0.1f, 1f)
         private val CRUMB = Color(0.15f, 0.45f, 0.95f, 0.85f)
         private val ARROW = Color(0.95f, 0.25f, 0.15f, 1f)
         private val CASING = Color(0.55f, 0.55f, 0.55f, 1f)

@@ -22,7 +22,7 @@ import kotlin.math.sqrt
 class ChunkData(val level: Int, val cx: Int, val cy: Int, val e0: Double, val n0: Double, val size: Double) {
     val terrain = MeshBuilder(4400)
     var roads: MeshBuilder? = null
-    val trees = MeshSet()
+    val trees = MeshSet(maxParts = 6)
     /** Water surfaces (streams, fords, lakes), drawn last with blending. */
     var water: MeshBuilder? = null
 }
@@ -266,7 +266,7 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             // Order so the faces point up regardless of direction (cull disabled for ribbons anyway).
             m.tri(p, p + 1, q + 1); m.tri(p, q + 1, q)
         }
-        if (d.level <= 1 && road.spec.surface.isPaved) markings(d, m, road, s0, s1, gs, a, b, lift)
+        if (d.level <= 1 && road.spec.surface.isPaved) markings(d, m, road, ground.roads.indexOf(road), s0, s1, gs, a, b, lift)
     }
 
     /**
@@ -288,7 +288,7 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
     }
 
     /** Painted lines: double yellow centre on main roads, white fog lines on roads 6 m+. */
-    private fun markings(d: ChunkData, m: MeshBuilder, road: Road, s0: Double, s1: Double, gs: GroundSample, a: DoubleArray, b: DoubleArray, lift: Double) {
+    private fun markings(d: ChunkData, m: MeshBuilder, road: Road, ri: Int, s0: Double, s1: Double, gs: GroundSample, a: DoubleArray, b: DoubleArray, lift: Double) {
         val lines = ArrayList<DoubleArray>() // offset, half width, rgb
         val kind = road.spec.kind
         if (kind == RoadKind.HIGHWAY || kind == RoadKind.MAJOR || (kind == RoadKind.MINOR && road.spec.width >= 6.0)) {
@@ -299,6 +299,17 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             lines += doubleArrayOf(0.1, 0.05, 0xe0b020.toDouble()); lines += doubleArrayOf(-0.1, 0.05, 0xe0b020.toDouble())
         }
         if (lines.isEmpty()) return
+        // Lines stop at junctions: the fog lines where another road comes in, and every line of
+        // the lesser road (the main road's centre line carries straight through).
+        val gaps = ArrayList<DoubleArray>() // x, y, radius, centre-line too (1) or not (0)
+        for (j in ground.scenery.junctions) {
+            if (j.x < d.e0 - 30 || j.x > d.e0 + d.size + 30 || j.y < d.n0 - 30 || j.y > d.n0 + d.size + 30) continue
+            val mine = j.arms.filter { it.road == ri }
+            if (mine.isEmpty()) continue
+            val widest = j.arms.filter { it.road != ri }.maxOfOrNull { ground.roads[it.road].halfWidth } ?: 3.0
+            val lesser = mine.maxOf { it.rank } < j.arms.maxOf { it.rank }
+            gaps += doubleArrayOf(j.x, j.y, if (lesser) widest + 4.0 else widest + 2.5, if (lesser) 1.0 else 0.0)
+        }
         val ds = if (d.level == 0) 2.0 else 5.0
         val steps = ((s1 - s0) / ds).toInt().coerceAtLeast(1)
         for (ln in lines) {
@@ -310,6 +321,8 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
                 val hdg = atan2(b[1] - a[1], b[0] - a[0])
                 road.line.pointAt(s, a)
                 val lx = -sin(hdg); val ly = cos(hdg)
+                val centre = abs(ln[0]) < 0.5
+                if (gaps.any { g -> (centre && g[3] < 0.5).not() && (a[0] - g[0]) * (a[0] - g[0]) + (a[1] - g[1]) * (a[1] - g[1]) < g[2] * g[2] }) { prevL = -1; prevR = -1; continue }
                 var vl = -1; var vr = -1
                 for (side in 0..1) {
                     val off = ln[0] + if (side == 0) -ln[1] else ln[1]
@@ -374,6 +387,7 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             }
         }
         canopy(d, ms)
+        SceneryMesh(ground, baseH).build(d, ms, ground.scenery) // one per chunk: chunks build on several threads
         if (detailed) {
             val b = Obstacles.Boulder()
             Obstacles.forEachBoulder(ground, d.e0, d.n0, d.e0 + d.size - 0.001, d.n0 + d.size - 0.001, b) { bo ->

@@ -119,7 +119,23 @@ class WorldBuilder(private val cache: DiskCache) {
             }
             Landcover.Area(code, rings)
         }
-        val ground = Ground(elevation, roads, streams, Landcover(areas))
+        // Buildings, walls, fences, signs and landmarks beside the roads; their lawns, fields and
+        // driveways then become part of the ground itself.
+        progress.update("Houses, walls and landmarks", 0.9f)
+        val sceneryBuilder = SceneryBuilder(Ground(elevation, roads, streams, Landcover(areas)), osm, proj, route, gpx.waypoints)
+        val scenery = sceneryBuilder.build()
+        roads += sceneryBuilder.driveways
+        val ground = Ground(elevation, roads, streams, Landcover(areas + sceneryBuilder.clearings))
+        ground.scenery = scenery
+        if (System.getProperty("nwadv.dumpScenery") != null) {
+            println("scenery: " + scenery.props.groupingBy { it.kind }.eachCount() + " runs " + scenery.runs.groupingBy { it.kind }.eachCount() +
+                " junctions ${scenery.junctions.size} landmarks ${scenery.landmarks.size} driveways ${sceneryBuilder.driveways.size}")
+            val o = DoubleArray(2)
+            for (j in scenery.junctions) { route.project(j.x, j.y, 0.0, Double.MAX_VALUE, o); println("  junction at route %.0f m, %.0f m off: ".format(o[0], o[1]) + j.arms.joinToString { "${it.name}(${it.rank}) %.0f".format(Math.toDegrees(it.heading)) }) }
+            for (k in PropKind.values()) scenery.props.filter { it.kind == k }.take(4).forEach { p ->
+                route.project(p.x, p.y, 0.0, Double.MAX_VALUE, o); println("  $k at route %.0f m, %.0f m off".format(o[0], o[1]))
+            }
+        }
 
         val tmp = DoubleArray(3)
         route.pointAt(0.0, tmp)
@@ -172,6 +188,16 @@ class WorldBuilder(private val cache: DiskCache) {
                 var j = i
                 while (j < n && follows[j]) j++
                 if (j - i < (80.0 / spacing).toInt()) for (k in i until j) follows[k] = false
+                i = j
+            }
+            // Short stretches off the mapped roads between two that follow them are the track
+            // cutting a junction corner, not a road of their own.
+            i = 0
+            while (i < n) {
+                if (follows[i]) { i++; continue }
+                var j = i
+                while (j < n && !follows[j]) j++
+                if (i > 0 && j < n && (j - i) * spacing < 40.0) for (k in i until j) follows[k] = true
                 i = j
             }
             val out = ArrayList<IntRange>()

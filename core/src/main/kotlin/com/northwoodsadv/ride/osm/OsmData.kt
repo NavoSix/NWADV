@@ -12,7 +12,18 @@ class OsmWay(val id: Long, val tags: Map<String, String>, val points: List<GeoPo
 /** An area: outer rings (closed) and holes. */
 class OsmArea(val id: Long, val tags: Map<String, String>, val outers: List<List<GeoPoint>>, val inners: List<List<GeoPoint>>)
 
-class OsmData(val ways: List<OsmWay>, val areas: List<OsmArea>) {
+/** A tagged point: a viewpoint, a named boulder, a church, a historical marker... */
+class OsmNode(val id: Long, val tags: Map<String, String>, val point: GeoPoint) {
+    operator fun get(k: String) = tags[k]
+}
+
+class OsmData(
+    val ways: List<OsmWay>,
+    val areas: List<OsmArea>,
+    val nodes: List<OsmNode> = emptyList(),
+    /** Building footprints (closed ways). */
+    val buildings: List<OsmWay> = emptyList(),
+) {
     companion object {
         val EMPTY = OsmData(emptyList(), emptyList())
 
@@ -21,16 +32,22 @@ class OsmData(val ways: List<OsmWay>, val areas: List<OsmArea>) {
             val root = JsonReader().parse(json)
             val ways = ArrayList<OsmWay>()
             val areas = ArrayList<OsmArea>()
+            val nodes = ArrayList<OsmNode>()
+            val buildings = ArrayList<OsmWay>()
             var el = root.get("elements")?.child
             while (el != null) {
                 val type = el.getString("type", "")
                 val tags = tags(el.get("tags"))
                 when (type) {
+                    "node" -> if (tags.isNotEmpty() && el.has("lat")) {
+                        nodes += OsmNode(el.getLong("id"), tags, GeoPoint(el.getDouble("lat"), el.getDouble("lon")))
+                    }
                     "way" -> {
                         val pts = geometry(el.get("geometry"))
                         if (pts.size >= 2) {
                             val w = OsmWay(el.getLong("id"), tags, pts)
-                            if (isAreaTagged(tags) && w.isClosed) areas += OsmArea(w.id, tags, listOf(pts), emptyList())
+                            if (tags.containsKey("building") && !tags.containsKey("highway") && w.isClosed) buildings += w
+                            else if (isAreaTagged(tags) && w.isClosed) areas += OsmArea(w.id, tags, listOf(pts), emptyList())
                             else ways += w
                         }
                     }
@@ -50,7 +67,7 @@ class OsmData(val ways: List<OsmWay>, val areas: List<OsmArea>) {
                 }
                 el = el.next
             }
-            return OsmData(ways, areas)
+            return OsmData(ways, areas, nodes, buildings)
         }
 
         private fun isAreaTagged(t: Map<String, String>) =

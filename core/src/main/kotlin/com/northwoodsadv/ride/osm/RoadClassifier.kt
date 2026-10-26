@@ -22,6 +22,9 @@ class RoadSpec(
     val bridge: Boolean = false,
     val ford: Boolean = false,
     val tunnel: Boolean = false,
+    /** A New England covered bridge (bridge=covered), and the bridge's own name if it has one. */
+    val covered: Boolean = false,
+    val bridgeName: String? = null,
 ) {
     val isClassVI get() = kind == RoadKind.CLASS_VI || kind == RoadKind.TRAIL
 }
@@ -74,7 +77,9 @@ object RoadClassifier {
 
         val roughness = roughness(t, kind, surface)
         val width = width(t, hw, kind)
-        return RoadSpec(kind, surface, width, roughness, name, bridge, ford, tunnel)
+        val covered = bridge && (t["bridge"] == "covered" || t["covered"] == "yes")
+        val bridgeName = t["bridge:name"] ?: t["name"]?.takeIf { "bridge" in it.lowercase() }
+        return RoadSpec(kind, surface, width, roughness, name, bridge, ford, tunnel, covered, bridgeName)
     }
 
     fun isClassVI(t: Map<String, String>): Boolean {

@@ -32,6 +32,7 @@ object Obstacles {
         if (p >= density(ground, ground.landcover.at(t.x, t.y), h)) return false
         if (ground.roadClearance(t.x, t.y) < 3.0) return false
         if (ground.streamClearance(t.x, t.y) < 1.0) return false
+        if (ground.scenery.solidAt(t.x, t.y, 2.0) != null) return false
         val q = Noise.rand(i, j, TREE_SEED + 3)
         t.height = 9 + 15 * q * if (h > Ground.TREELINE - 150) 0.35 else 1.0
         t.trunkR = 0.10 + 0.22 * q
@@ -58,6 +59,7 @@ object Obstacles {
         if (ground.landcover.at(b.x, b.y) != Landcover.FOREST) return false
         if (ground.roadClearance(b.x, b.y) < b.r + 1.5) return false
         if (ground.streamClearance(b.x, b.y) < b.r) return false
+        if (ground.scenery.solidAt(b.x, b.y, b.r + 1) != null) return false
         return true
     }
 

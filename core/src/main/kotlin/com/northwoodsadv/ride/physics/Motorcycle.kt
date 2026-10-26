@@ -4,6 +4,7 @@ import com.northwoodsadv.ride.world.Ground
 import com.northwoodsadv.ride.world.GroundSample
 import com.northwoodsadv.ride.world.Noise
 import com.northwoodsadv.ride.world.Obstacles
+import com.northwoodsadv.ride.world.PropKind
 import com.northwoodsadv.ride.world.Surface
 import kotlin.math.PI
 import kotlin.math.abs
@@ -26,6 +27,8 @@ enum class CrashReason(val message: String) {
     LOOPED("Looped it. Too much throttle."),
     ENDO("Over the bars!"),
     TREE("Hit a tree."),
+    BUILDING("Rode into a building."),
+    BOULDER("Hit a boulder."),
     CASED("Cased the landing."),
     DROWNED("Drowned the bike. Too deep."),
 }
@@ -751,6 +754,20 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
         val cy = cos(yaw); val sy = sin(yaw)
         val fxp = x + cy * (spec.cgToFront + spec.frontRadius); val fyp = y + sy * (spec.cgToFront + spec.frontRadius)
         val rxp = x - cy * spec.cgToRear; val ryp = y - sy * spec.cgToRear
+        // Buildings, silos, big boulders and the like: probe along the bike.
+        for (k in 0..3) {
+            val f = k / 3.0
+            val px = rxp + (fxp - rxp) * f; val py = ryp + (fyp - ryp) * f
+            val hitProp = ground.scenery.solidAt(px, py, 0.3) ?: continue
+            if (speed > 2.5) crash = if (hitProp.kind == PropKind.ERRATIC) CrashReason.BOULDER else CrashReason.BUILDING
+            else {
+                vx = 0.0; vy = 0.0; yawRate = 0.0; omegaF = 0.0; omegaR = 0.0
+                val nx = px - hitProp.x; val ny = py - hitProp.y
+                val nl = max(hypot(nx, ny), 1e-6)
+                x += nx / nl * 0.05; y += ny / nl * 0.05
+            }
+            break
+        }
         val minX = min(fxp, rxp) - 1; val maxX = max(fxp, rxp) + 1
         val minY = min(fyp, ryp) - 1; val maxY = max(fyp, ryp) + 1
         Obstacles.forEachTree(ground, minX, minY, maxX, maxY, treeTmp) { t ->

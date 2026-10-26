@@ -72,7 +72,9 @@ class Landcover(private val areas: List<Area>) {
         const val WETLAND: Byte = 3
         const val ROCK: Byte = 4
         const val SCRUB: Byte = 5
-        private val PRIORITY = listOf(FOREST, SCRUB, OPEN, WETLAND, ROCK, WATER) // later wins
+        /** Cut low so a view stays open (below scenic overlooks): no trees, brushy ground. */
+        const val CLEARING: Byte = 6
+        private val PRIORITY = listOf(FOREST, SCRUB, CLEARING, OPEN, WETLAND, ROCK, WATER) // later wins
         const val CELL = 5.0
         const val N = 256
         const val TILE_M = CELL * N

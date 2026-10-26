@@ -51,6 +51,9 @@ class Ground(
     val streams: List<Stream> = emptyList(),
     val landcover: Landcover = Landcover(emptyList()),
 ) {
+    /** Buildings, walls, signs and landmarks beside the roads (set once the world is built). */
+    var scenery: Scenery = Scenery.EMPTY
+
     private val roadIndex = SegmentIndex(roads.map { it.line }, DoubleArray(roads.size) { influence(roads[it]) })
     private val streamIndex = SegmentIndex(streams.map { it.line }, DoubleArray(streams.size) { streams[it].width / 2 + BANK })
     private val hitsTL = ThreadLocal.withInitial { Array(16) { SegmentIndex.Hit() } }
@@ -242,7 +245,7 @@ class Ground(
         code == Landcover.WATER -> Surface.DEEP_WATER
         code == Landcover.WETLAND -> Surface.MUD
         code == Landcover.ROCK -> Surface.ROCK
-        code == Landcover.OPEN -> Surface.GRASS
+        code == Landcover.OPEN || code == Landcover.CLEARING -> Surface.GRASS
         h > TREELINE -> if (Noise.value1(h * 0.13, 5) > 0.5) Surface.ROCK else Surface.GRASS
         else -> Surface.FOREST
     }

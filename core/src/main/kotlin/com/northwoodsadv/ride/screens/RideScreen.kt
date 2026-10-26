@@ -25,6 +25,7 @@ import com.northwoodsadv.ride.render.WorldShader
 import com.northwoodsadv.ride.route.RouteTracker
 import com.northwoodsadv.ride.ui.Ui
 import com.northwoodsadv.ride.world.Canopy
+import com.northwoodsadv.ride.world.Landmark
 import com.northwoodsadv.ride.world.World
 import kotlin.math.abs
 import kotlin.math.floor
@@ -34,7 +35,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val model = com.northwoodsadv.ride.bikes.Bikes.byId(settings.bikeId)
     private val spec = model.spec
     private val bike = Motorcycle(spec, world.ground)
-    private val tracker = RouteTracker(world.route)
+    private val tracker = RouteTracker(world.route).apply { nameTurns(world.ground.scenery.junctions) }
     private val autopilot = Autopilot(world.route, world.ground)
     private var autoRide = game.autoplay
     private val controls = RideControls(settings, game.platform.isTouchDevice)
@@ -69,6 +70,10 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var crashTimer = 0.0
     private var safeTimer = 0.0
     private var safeX = world.spawnX; private var safeY = world.spawnY; private var safeHeading = world.spawnHeading
+    /** The landmark being passed, shown for a few seconds, and the ones already announced. */
+    private var landmark: Landmark? = null
+    private var landmarkTimer = 0.0
+    private val announced = HashSet<Landmark>()
     private var banner: String? = null
     private var bannerTimer = 0.0
     private var notesTimer = if (world.notes.isEmpty()) 0.0 else 9.0
@@ -98,6 +103,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             val at = parts.last().toDoubleOrNull() ?: return@let
             val p = DoubleArray(3); world.roads[road.coerceIn(0, world.roads.size - 1)].line.pointAt(at, p); bike.reset(p[0], p[1], p[2])
         }
+        // ... turned by some degrees (to look at the roadside).
+        System.getProperty("nwadv.startTurn")?.toDoubleOrNull()?.let { bike.reset(bike.x, bike.y, bike.yaw + Math.toRadians(it)) }
         rebase(true)
         banner = world.name; bannerTimer = 4.0
     }
@@ -129,6 +136,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             bike.update(dt.toDouble(), controls.input, settings.assists)
             tracker.update(bike.x, bike.y, dt.toDouble())
             gps.recordCrumb(bike.x, bike.y)
+            checkLandmarks(dt.toDouble())
             handleCrash(dt.toDouble())
         }
 
@@ -195,6 +203,19 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         // --- HUD ----------------------------------------------------------------------------
         if (!noHud) drawHud(dt)
         ui.endFrame()
+    }
+
+    private fun checkLandmarks(dt: Double) {
+        landmarkTimer -= dt
+        if (landmarkTimer > 0) return
+        for (l in world.ground.scenery.landmarks) {
+            if (l.kind == "Peak" || l in announced) continue
+            val reach = if (l.kind == "Scenic view") 160.0 else 110.0
+            if ((l.x - bike.x) * (l.x - bike.x) + (l.y - bike.y) * (l.y - bike.y) < reach * reach) {
+                announced += l; landmark = l; landmarkTimer = 5.0
+                break
+            }
+        }
     }
 
     private fun handleCrash(dt: Double) {
@@ -312,6 +333,17 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         var my = ui.h - u * 8.5f
         if (autoRide) { ui.text("AUTO-RIDE demo: press Auto to take over", u * 1.5f, my, Ui2.AUTO, Align.left, ui.font, msgW); my -= u * 3f }
         if (bannerTimer > 0) banner?.let { ui.text(it, 0f, ui.h * 0.66f, Color.WHITE, Align.center, ui.big, ui.w) }
+        val lm = landmark
+        if (landmarkTimer > 0 && lm != null) {
+            // A plaque-style card: what it is, and its name.
+            val a = minOf(1f, landmarkTimer.toFloat() / 0.6f, (5f - landmarkTimer.toFloat()) / 0.4f).coerceIn(0f, 1f)
+            val cw = minOf(ui.w * 0.5f, u * 46f); val ch = u * 6.4f
+            val cx = (ui.w - cw) / 2; val cy = ui.h * 0.27f
+            ui.rect(cx, cy, cw, ch, Color(0.12f, 0.24f, 0.16f, 0.85f * a))
+            ui.rect(cx + u * 0.35f, cy + u * 0.35f, cw - u * 0.7f, ch - u * 0.7f, Color(0.85f, 0.8f, 0.6f, 0.25f * a))
+            ui.text(lm.kind.uppercase(), cx, cy + ch - u * 0.9f, Color(0.9f, 0.85f, 0.6f, a), Align.center, ui.font, cw)
+            ui.text(lm.name, cx, cy + ch - u * 3.1f, Color(1f, 1f, 1f, a), Align.center, ui.font, cw)
+        }
         notesTimer -= dt
         if (notesTimer > 0) {
             for (n in world.notes) {

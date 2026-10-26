@@ -15,7 +15,7 @@ object Palette {
         val jitter = (Noise.value2(e * 0.08, n * 0.08, 77) - 0.5) * 0.18
         var rgb = when (s.surface) {
             Surface.FOREST -> if (Noise.value2(e * 0.2, n * 0.2, 9) > 0.6) 0x5a5030 else 0x4a4a2a
-            Surface.GRASS -> if (s.landcover == Landcover.OPEN) 0x7a9a48 else 0x6a8a40
+            Surface.GRASS -> when (s.landcover) { Landcover.OPEN -> 0x7a9a48; Landcover.CLEARING -> 0x66703a; else -> 0x6a8a40 }
             else -> s.surface.color
         }
         if (s.grassStrip) rgb = 0x6a7a38

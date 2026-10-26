@@ -50,7 +50,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         }
     }
 
-    private fun paintOf(b: BikeModel) = game.settings.paint(b.id) ?: b.paints.firstOrNull()?.id
+    private fun paintOf(b: BikeModel) = game.settings.activePaint(b)
     private fun renderer(b: BikeModel): BikeRenderer {
         val paint = paintOf(b)
         return renderers.getOrPut("${b.id}/$paint") { BikeRenderer(b.spec, b.look(Detail.SHOWROOM, paint)) }
@@ -176,13 +176,24 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
             for ((k, pt) in bike.paints.withIndex()) {
                 val bx = px + u + (k % perRow) * (bw + gap)
                 val by = py + ph - u - bh - (k / perRow) * (bh + gap)
-                if (ui.button("", bx, by, bw, bh, active = pt.id == current)) game.settings.setPaint(bike.id, pt.id)
+                // Paints still to be earned: a padlock instead of the swatch, and no hint how.
+                val open = game.settings.paintUnlocked(pt.id)
+                if (ui.button("", bx, by, bw, bh, active = pt.id == current, enabled = open) && open) game.settings.setPaint(bike.id, pt.id)
                 val sw = bh * 0.55f
                 val sx = bx + u * 0.7f; val sy = by + (bh - sw) / 2
-                ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, Color.WHITE, Align.left, ui.font, bw - sw - u * 1.8f)
+                ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, if (open) Color.WHITE else Color.GRAY, Align.left, ui.font, bw - sw - u * 1.8f)
                 ui.rect(sx - 2, sy - 2, sw + 4, sw + 4, Color.BLACK)
-                ui.rect(sx, sy + sw / 2, sw, sw / 2, swatch(pt.swatch))
-                ui.rect(sx, sy, sw, sw / 2, swatch(pt.swatch2))
+                if (open) {
+                    ui.rect(sx, sy + sw / 2, sw, sw / 2, swatch(pt.swatch))
+                    ui.rect(sx, sy, sw, sw / 2, swatch(pt.swatch2))
+                } else {
+                    // A little padlock.
+                    ui.rect(sx, sy, sw, sw, Color(0.22f, 0.22f, 0.24f, 1f))
+                    ui.rect(sx + sw * 0.25f, sy + sw * 0.15f, sw * 0.5f, sw * 0.4f, Color.GRAY)
+                    ui.rect(sx + sw * 0.32f, sy + sw * 0.55f, sw * 0.08f, sw * 0.25f, Color.GRAY)
+                    ui.rect(sx + sw * 0.60f, sy + sw * 0.55f, sw * 0.08f, sw * 0.25f, Color.GRAY)
+                    ui.rect(sx + sw * 0.32f, sy + sw * 0.75f, sw * 0.36f, sw * 0.07f, Color.GRAY)
+                }
             }
         }
 

@@ -117,9 +117,11 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
 - **Donovan's Royal Enfield Himalayan 411**, modelled on the real bike as Donovan has it set up:
   - Rock Red, with a tall screen, phone mount, Tusk handguards, crash bars, tank guards, skid
     plate, pannier frames and rear rack.
-  - Three more factory paint schemes to pick in the garage: Lake Blue (blue over white), White
-    Flame from the Scram 411 (white and red), and Pine Green (camouflage on the tank, side
-    panels and fenders). The choice is remembered for each bike.
+  - Three more factory paint schemes to earn: Lake Blue (blue over white), White Flame from the
+    Scram 411 (white and red), and Pine Green (camouflage on the tank, side panels and fenders).
+    Each is unlocked by an achievement on the road; what it takes stays a secret until you've
+    done it, when a notice tells you. Pick unlocked paints in the garage; the choice is
+    remembered for each bike. (Auto-ride doesn't count.)
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
   - 207 kg with the accessories.
   - 21"/17" spoked wheels on knobbies, 200/180 mm travel, 26.5 deg rake.

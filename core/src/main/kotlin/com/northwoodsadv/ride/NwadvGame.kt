@@ -23,6 +23,7 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         ui.resize(Gdx.graphics.width, Gdx.graphics.height)
         // Development: choose the bike / open the garage from the desktop command line.
         System.getProperty("nwadv.bike")?.let { settings.bikeId = it }
+        if (System.getProperty("nwadv.unlockAll") != null) com.northwoodsadv.ride.progress.Achievement.entries.forEach { settings.unlock(it) }
         System.getProperty("nwadv.paint")?.let { settings.setPaint(settings.bikeId, it) }
         val pending = platform.takePendingGpx()
         when {
@@ -51,8 +52,12 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
             return
         }
         routes.remember(name, contents)
+        ownRoute = !RouteLibrary.isBundled(name)
         startRide(gpx)
     }
+
+    /** The route being ridden is one the rider loaded (achievements on "your own routes" count). */
+    var ownRoute = false; private set
 
     fun startRide(gpx: GpxFile) = setScreen(LoadingScreen(this, gpx))
 
@@ -85,12 +90,14 @@ class RouteLibrary(private val game: NwadvGame) {
     }
 
     fun remember(name: String, contents: String) {
-        if (BUNDLED.any { it.first == name || it.second == name.removeSuffix(".gpx") }) return
+        if (isBundled(name)) return
         val safe = name.replace(Regex("[^A-Za-z0-9 ._-]"), "_").removeSuffix(".gpx").take(60)
         try { dir.child("$safe.gpx").writeString(contents, false, "UTF-8") } catch (_: Exception) {}
     }
 
     companion object {
+        fun isBundled(name: String) = BUNDLED.any { it.first == name || it.second == name.removeSuffix(".gpx") }
+
         val BUNDLED = listOf(
             "kancamagus_approx.gpx" to "Sample: Kancamagus Highway (approx.)",
             "classvi_practice.gpx" to "Sample: Class VI practice trail",

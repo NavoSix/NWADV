@@ -42,7 +42,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val shader = WorldShader.create()
     private val baseH = world.ground.height(world.spawnX, world.spawnY, false)
     private val chunks = ChunkManager(ChunkBuilder(world.ground, baseH, settings.season), if (Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Desktop) 3 else 2)
-    private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE, settings.paint(model.id)))
+    private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE, settings.activePaint(model)))
     // In the helmet view the moving map is shown on the bike's own phone / GPS screen.
     private val navTex: com.badlogic.gdx.graphics.glutils.FrameBuffer? = bikeRenderer.navScreen?.let { ns ->
         val long = 512f
@@ -74,6 +74,10 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var landmark: Landmark? = null
     private var landmarkTimer = 0.0
     private val announced = HashSet<Landmark>()
+    private val achievements = com.northwoodsadv.ride.progress.AchievementTracker(settings)
+    /** Newly unlocked achievements, shown one at a time. */
+    private val unlockedQueue = ArrayDeque<com.northwoodsadv.ride.progress.Achievement>()
+    private var unlockTimer = 0.0
     private var banner: String? = null
     private var bannerTimer = 0.0
     private var notesTimer = if (world.notes.isEmpty()) 0.0 else 9.0
@@ -138,6 +142,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             gps.recordCrumb(bike.x, bike.y)
             checkLandmarks(dt.toDouble())
             handleCrash(dt.toDouble())
+            trackAchievements(dt.toDouble())
         }
 
         audio.rpm = bike.rpm.toFloat()
@@ -203,6 +208,13 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         // --- HUD ----------------------------------------------------------------------------
         if (!noHud) drawHud(dt)
         ui.endFrame()
+    }
+
+    private fun trackAchievements(dt: Double) {
+        if (autoRide || bike.crash != null) { achievements.interrupt(); return }
+        val gs = bike.sampleF
+        val classVI = gs.road >= 0 && gs.roadBlend > 0.5 && world.roads[gs.road].spec.isClassVI
+        unlockedQueue.addAll(achievements.update(dt, bike.speed, bike.waterDepth > 0.03, classVI, game.ownRoute))
     }
 
     private fun checkLandmarks(dt: Double) {
@@ -363,6 +375,22 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
                 my -= th + u * 0.6f
             }
         }
+        // Achievement unlocked: a small card at the top, one at a time.
+        if (unlockTimer <= 0 && unlockedQueue.isNotEmpty()) { unlockTimer = 6.0; game.platform.vibrate(80) }
+        val ach = unlockedQueue.firstOrNull()
+        if (ach != null && unlockTimer > 0) {
+            unlockTimer -= dt
+            val a = minOf(1f, unlockTimer.toFloat() / 0.5f, (6f - unlockTimer.toFloat()) / 0.4f).coerceIn(0f, 1f)
+            val body = "${ach.story}. ${ach.paintName} paint unlocked."
+            val cw = minOf(ui.w * 0.5f, u * 46f)
+            val ch = u * 3.6f + ui.textHeight(body, cw - u * 2) + u * 1.2f
+            val cx = (ui.w - cw) / 2; val cy = ui.h - ch - u * 6.5f
+            ui.rect(cx, cy, cw, ch, Color(0.08f, 0.08f, 0.1f, 0.88f * a))
+            ui.rect(cx, cy + ch - u * 0.45f, cw, u * 0.45f, Color(0.95f, 0.72f, 0.2f, a))
+            ui.text("Achievement unlocked: ${ach.title}", cx, cy + ch - u * 1.2f, Color(0.95f, 0.72f, 0.2f, a), Align.center, ui.font, cw)
+            ui.text(body, cx + u, cy + ch - u * 3.6f, Color(0.88f, 0.88f, 0.88f, a), Align.center, ui.font, cw - u * 2, true)
+            if (unlockTimer <= 0) unlockedQueue.removeFirst()
+        }
         if (paused) drawPause()
     }
 
@@ -386,7 +414,10 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             u * 4, y, Color.LIGHT_GRAY, Align.center, ui.font, ui.w - u * 8, true)
     }
 
+    override fun pause() { achievements.save() }
+
     override fun dispose() {
+        achievements.save()
         chunks.dispose(); shader.dispose(); bikeRenderer.dispose(); audio.dispose()
         skyShader.dispose(); skyQuad.dispose(); wake.dispose()
         navTex?.dispose(); navBatch.dispose()

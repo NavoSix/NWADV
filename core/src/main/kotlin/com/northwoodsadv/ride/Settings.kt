@@ -8,8 +8,8 @@ import com.northwoodsadv.ride.physics.SteerMode
 import com.northwoodsadv.ride.render.CameraMode
 import com.northwoodsadv.ride.render.Season
 
-/** Player preferences, persisted with libGDX Preferences. */
-class Settings {
+/** Player preferences (and achievement progress), persisted with libGDX Preferences. */
+class Settings : com.northwoodsadv.ride.progress.ProgressStore {
     private val prefs: Preferences = Gdx.app.getPreferences("nwadv")
 
     var imperial = prefs.getBoolean("imperial", true)
@@ -22,6 +22,20 @@ class Settings {
     /** Chosen paint scheme for a bike (by bike id), or null for its first. */
     fun paint(bikeId: String): String? = prefs.getString("paint.$bikeId", null)
     fun setPaint(bikeId: String, paintId: String) { prefs.putString("paint.$bikeId", paintId); prefs.flush() }
+
+    /** A paint that's free or already earned. */
+    fun paintUnlocked(paintId: String?): Boolean =
+        com.northwoodsadv.ride.progress.Achievement.forPaint(paintId)?.let { isUnlocked(it) } ?: true
+
+    /** The paint to show: the chosen one if it's unlocked, else the bike's first. */
+    fun activePaint(bike: com.northwoodsadv.ride.bikes.BikeModel): String? =
+        paint(bike.id)?.takeIf { p -> paintUnlocked(p) && bike.paints.any { it.id == p } } ?: bike.paints.firstOrNull()?.id
+
+    override fun number(key: String) = prefs.getString(key, "0").toDoubleOrNull() ?: 0.0
+    override fun setNumber(key: String, v: Double) { prefs.putString(key, v.toString()) }
+    override fun isUnlocked(a: com.northwoodsadv.ride.progress.Achievement) = prefs.getBoolean("unlocked.${a.id}", false)
+    override fun unlock(a: com.northwoodsadv.ride.progress.Achievement) { prefs.putBoolean("unlocked.${a.id}", true) }
+    override fun flush() { prefs.flush() }
     var camera = runCatching { CameraMode.valueOf(prefs.getString("camera", CameraMode.CHASE.name)) }.getOrDefault(CameraMode.CHASE)
     val assists = Assists(
         steerMode = runCatching { SteerMode.valueOf(prefs.getString("steerMode", SteerMode.LEAN.name)) }.getOrDefault(SteerMode.LEAN),

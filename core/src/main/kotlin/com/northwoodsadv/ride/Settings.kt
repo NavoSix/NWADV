@@ -31,6 +31,17 @@ class Settings : com.northwoodsadv.ride.progress.ProgressStore {
     fun activePaint(bike: com.northwoodsadv.ride.bikes.BikeModel): String? =
         paint(bike.id)?.takeIf { p -> paintUnlocked(bike.id, p) && bike.paints.any { it.id == p } } ?: bike.paints.firstOrNull()?.id
 
+    /**
+     * Where the rider left off on a route (by route name): a [RideSave] line, or null. Kept in
+     * its own preferences file so a long list of routes doesn't slow the settings.
+     */
+    fun rideSave(route: String): RideSave? = RideSave.parse(rides.getString(route, null))
+    fun setRideSave(route: String, save: RideSave?) {
+        if (save == null) rides.remove(route) else rides.putString(route, save.format())
+        rides.flush()
+    }
+    private val rides: Preferences = Gdx.app.getPreferences("nwadv-rides")
+
     override fun number(key: String) = prefs.getString(key, "0").toDoubleOrNull() ?: 0.0
     override fun setNumber(key: String, v: Double) { prefs.putString(key, v.toString()) }
     override fun isUnlocked(a: com.northwoodsadv.ride.progress.Achievement) = prefs.getBoolean("unlocked.${a.id}", false)

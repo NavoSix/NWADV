@@ -53,11 +53,15 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         }
         routes.remember(name, contents)
         ownRoute = !RouteLibrary.isBundled(name)
+        routeKey = RideSave.key(name); routeHash = contents.hashCode()
         startRide(gpx)
     }
 
     /** The route being ridden is one the rider loaded (achievements on "your own routes" count). */
     var ownRoute = false; private set
+    /** The route being ridden, for saving where the rider left off ([RideSave]). */
+    var routeKey: String? = null; private set
+    var routeHash = 0; private set
 
     fun startRide(gpx: GpxFile) = setScreen(LoadingScreen(this, gpx))
 

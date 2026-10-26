@@ -78,6 +78,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     /** Newly unlocked achievements, shown one at a time. */
     private val unlockedQueue = ArrayDeque<com.northwoodsadv.ride.progress.Achievement>()
     private var unlockTimer = 0.0
+    /** Started from a saved spot rather than the start of the route. */
+    private var resumed = false
     private var banner: String? = null
     private var bannerTimer = 0.0
     private var notesTimer = if (world.notes.isEmpty()) 0.0 else 9.0
@@ -107,10 +109,12 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             val at = parts.last().toDoubleOrNull() ?: return@let
             val p = DoubleArray(3); world.roads[road.coerceIn(0, world.roads.size - 1)].line.pointAt(at, p); bike.reset(p[0], p[1], p[2])
         }
+        // Otherwise pick up where the rider left off on this route last time.
+        if (System.getProperty("nwadv.startAt") == null && System.getProperty("nwadv.startRoadAt") == null) resumeSaved()
         // ... turned by some degrees (to look at the roadside).
         System.getProperty("nwadv.startTurn")?.toDoubleOrNull()?.let { bike.reset(bike.x, bike.y, bike.yaw + Math.toRadians(it)) }
         rebase(true)
-        banner = world.name; bannerTimer = 4.0
+        banner = if (resumed) "${world.name}\nPicking up where you left off" else world.name; bannerTimer = 4.0
     }
 
     private fun rebase(force: Boolean) {
@@ -143,6 +147,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             checkLandmarks(dt.toDouble())
             handleCrash(dt.toDouble())
             trackAchievements(dt.toDouble())
+            saveTimer += dt
+            if (saveTimer > 15) saveRide()
         }
 
         audio.rpm = bike.rpm.toFloat()
@@ -209,6 +215,34 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (!noHud) drawHud(dt)
         ui.endFrame()
     }
+
+    // --- saving where the rider left off ---------------------------------------------------
+
+    private var saveTimer = 0.0
+
+    private fun resumeSaved() {
+        val key = game.routeKey ?: return
+        val save = settings.rideSave(key) ?: return
+        if (save.routeHash != game.routeHash) return // the file changed: start afresh
+        val x = world.proj.east(save.lon); val y = world.proj.north(save.lat)
+        if (world.ground.scenery.solidAt(x, y, 1.5) != null) return
+        bike.reset(x, y, save.heading)
+        bike.odometer = save.odometer
+        tracker.resumeAt(save.along)
+        safeX = x; safeY = y; safeHeading = save.heading
+        resumed = true
+    }
+
+    /** Remember this spot on the route: the last place the bike was upright and moving. */
+    private fun saveRide() {
+        val key = game.routeKey ?: return
+        if (tracker.finished) { settings.setRideSave(key, null); return }
+        settings.setRideSave(key, com.northwoodsadv.ride.RideSave(world.proj.lat(safeY), world.proj.lon(safeX), safeHeading,
+            tracker.along, bike.odometer, game.routeHash))
+        saveTimer = 0.0
+    }
+
+    private fun clearRideSave() { game.routeKey?.let { settings.setRideSave(it, null) } }
 
     private fun trackAchievements(dt: Double) {
         if (autoRide || bike.crash != null) { achievements.interrupt(); return }
@@ -406,7 +440,11 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         // Same as after a fall: back on the route a little behind where you are.
         if (ui.button("Reset position", x, y, bw, bh)) { respawn(); paused = false }
         y -= bh + u
-        if (ui.button("Back to start of route", x, y, bw, bh)) { bike.reset(world.spawnX, world.spawnY, world.spawnHeading); chase.snap(); paused = false }
+        if (ui.button("Back to start of route", x, y, bw, bh)) {
+            bike.reset(world.spawnX, world.spawnY, world.spawnHeading); tracker.resumeAt(0.0); chase.snap(); paused = false
+            safeX = world.spawnX; safeY = world.spawnY; safeHeading = world.spawnHeading
+            clearRideSave()
+        }
         y -= bh + u
         if (ui.button("Main menu", x, y, bw, bh)) game.toMenu()
         y -= bh + u * 2
@@ -414,10 +452,11 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             u * 4, y, Color.LIGHT_GRAY, Align.center, ui.font, ui.w - u * 8, true)
     }
 
-    override fun pause() { achievements.save() }
+    override fun pause() { achievements.save(); saveRide() }
 
     override fun dispose() {
         achievements.save()
+        saveRide()
         chunks.dispose(); shader.dispose(); bikeRenderer.dispose(); audio.dispose()
         skyShader.dispose(); skyQuad.dispose(); wake.dispose()
         navTex?.dispose(); navBatch.dispose()

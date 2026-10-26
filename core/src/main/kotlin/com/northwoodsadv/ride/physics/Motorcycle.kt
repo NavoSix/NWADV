@@ -126,7 +126,8 @@ class Motorcycle(val spec: BikeSpec, private val ground: Ground) {
     /** True while a riding buddy is pushing you out of a hole. */
     var buddyPush = false; private set
     private var stuckTime = 0.0
-    var odometer = 0.0; private set
+    var odometer = 0.0
+        internal set
     val sampleF = GroundSample()
     val sampleR = GroundSample()
 

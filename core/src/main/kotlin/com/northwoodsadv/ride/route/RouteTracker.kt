@@ -64,6 +64,9 @@ class RouteTracker(original: Polyline) {
         turns = out.sortedBy { it.along }
     }
 
+    /** Pick up part way along (a saved ride), so the next update searches around there. */
+    fun resumeAt(s: Double) { along = s.coerceIn(0.0, route.length) }
+
     val remaining get() = (route.length - along).coerceAtLeast(0.0)
     val finished get() = remaining < 25 && !isOffRoute
 

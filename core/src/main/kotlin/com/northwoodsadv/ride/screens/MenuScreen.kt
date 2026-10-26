@@ -43,7 +43,10 @@ class MenuScreen(private val game: NwadvGame, private var message: String? = nul
         var ry = y - bh + scroll
         for (e in entries) {
             if (ry < u * 6 || ry > y) { ry -= bh + u; continue }
-            if (ui.button(e.title, u * 3, ry, colW, bh)) {
+            // Routes ridden part way say where you'll pick up.
+            val save = s.rideSave(com.northwoodsadv.ride.RideSave.key(e.title))
+            val label = if (save != null) "${e.title}\nContinue at ${s.distance(save.along)}" else e.title
+            if (ui.button(label, u * 3, ry, colW, bh)) {
                 try { game.openGpx(e.title + ".gpx", e.load()) } catch (ex: Exception) { message = "Couldn't read ${e.title}: ${ex.message}" }
             }
             ry -= bh + u

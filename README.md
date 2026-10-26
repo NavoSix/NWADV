@@ -58,6 +58,10 @@ New Hampshire's unmaintained Class VI roads.
   - Peaks on the map, and any waypoints in your GPX file (the club's lunch stop, a gas
     station), with a brown sign by the road.
 - **Solid.** Buildings, silos, towers and big boulders stop the bike, just as trees do.
+- **Saved progress.** Close the game (or go back to the menu) part way along a route and the
+  next time you open that route you pick up where you left off: the route list shows where
+  you'll continue. *Back to start of route* in the pause menu starts it over, and finishing the
+  route clears it.
 - **Offline after first load.** Everything downloaded is cached, so a ride works without a
   connection the next time.
 

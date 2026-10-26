@@ -160,7 +160,9 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
                     // Flat at the water level, except where a bank falls away below it (a stream
                     // crossing a slope): there the edge follows the ground instead of floating.
                     ground.sample(e, n, gs, false)
-                    val y = minOf(level, gs.height + gs.waterDepth - 0.03)
+                    var y = minOf(level, gs.height + gs.waterDepth - 0.03)
+                    // Never over a road it's piped under (only Class VI roads ford).
+                    if (gs.road >= 0 && gs.roadBlend > 0.5 && !ground.roads[gs.road].spec.isClassVI) y = minOf(y, gs.height - 0.25)
                     m.vertex((e - d.e0).toFloat(), (y - baseH).toFloat(), (-(n - d.n0)).toFloat(), 0f, 1f, 0f, col)
                 }
                 if (prev >= 0) for (l in 0 until WATER_LANES - 1) { m.tri(prev + l, first + l, first + l + 1); m.tri(prev + l, first + l + 1, prev + l + 1) }
@@ -174,12 +176,14 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
         for (j in 0..n) for (i in 0..n) {
             ground.sample(d.e0 + i * step, d.n0 + j * step, gs, false)
             if (gs.surface == com.northwoodsadv.ride.world.Surface.DEEP_WATER && gs.road < 0) lvl[j * (n + 1) + i] = (gs.waterLevel.takeIf { !it.isNaN() } ?: gs.height + 0.05).toFloat()
+            else if (gs.road >= 0 && gs.roadBlend > 0.3) lvl[j * (n + 1) + i] = -1e9f // keeps the lake off the road
         }
         for (j in 0 until n) for (i in 0 until n) {
             val c = intArrayOf(j * (n + 1) + i, j * (n + 1) + i + 1, (j + 1) * (n + 1) + i + 1, (j + 1) * (n + 1) + i)
             var sum = 0f; var cnt = 0
-            for (q in c) if (!lvl[q].isNaN()) { sum += lvl[q]; cnt++ }
-            if (cnt == 0) continue
+            var onRoad = false
+            for (q in c) if (lvl[q] < -1e8f) onRoad = true else if (!lvl[q].isNaN()) { sum += lvl[q]; cnt++ }
+            if (cnt == 0 || onRoad) continue
             val y = sum / cnt - baseH.toFloat()
             val x0 = (i * step).toFloat(); val x1 = ((i + 1) * step).toFloat()
             val z0 = (-j * step).toFloat(); val z1 = (-(j + 1) * step).toFloat()
@@ -266,7 +270,9 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
             // Order so the faces point up regardless of direction (cull disabled for ribbons anyway).
             m.tri(p, p + 1, q + 1); m.tri(p, q + 1, q)
         }
-        if (d.level <= 1 && road.spec.surface.isPaved) markings(d, m, road, ground.roads.indexOf(road), s0, s1, gs, a, b, lift)
+        // (No painted lines on the bits of GPX track that cut a corner between mapped roads.)
+        val stub = road.id < 0 && road.id > com.northwoodsadv.ride.world.SceneryBuilder.DRIVEWAY_ID && road.line.length < 300
+        if (d.level <= 1 && road.spec.surface.isPaved && !stub) markings(d, m, road, ground.roads.indexOf(road), s0, s1, gs, a, b, lift)
     }
 
     /**

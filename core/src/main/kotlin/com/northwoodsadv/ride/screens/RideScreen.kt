@@ -239,11 +239,21 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private fun respawn() {
         crashTimer = 0.0
         val p = DoubleArray(3)
+        val solids = world.ground.scenery
         if (tracker.offRoute < 60) {
-            world.route.resample(5.0).pointAt((tracker.along - 12).coerceAtLeast(0.0), p)
-            val ahead = DoubleArray(3); world.route.pointAt((tracker.along - 6).coerceAtLeast(0.0) + 6, ahead)
+            // A few metres back along the route, further if that's inside something solid.
+            var at = (tracker.along - 12).coerceAtLeast(0.0)
+            world.route.pointAt(at, p)
+            while (solids.solidAt(p[0], p[1], 1.5) != null && at > 0 && tracker.along - at < 150) { at = (at - 6).coerceAtLeast(0.0); world.route.pointAt(at, p) }
+            val ahead = DoubleArray(3); world.route.pointAt(at + 6, ahead)
             bike.reset(p[0], p[1], kotlin.math.atan2(ahead[1] - p[1], ahead[0] - p[0]))
-        } else bike.reset(safeX, safeY, safeHeading)
+        } else if (solids.solidAt(safeX, safeY, 1.5) == null) bike.reset(safeX, safeY, safeHeading)
+        else {
+            world.route.project(bike.x, bike.y, 0.0, Double.MAX_VALUE, p)
+            val s0 = p[0]; world.route.pointAt(s0, p)
+            val ahead = world.route.pointAt(s0 + 6, DoubleArray(3))
+            bike.reset(p[0], p[1], kotlin.math.atan2(ahead[1] - p[1], ahead[0] - p[0]))
+        }
         chase.snap()
     }
 

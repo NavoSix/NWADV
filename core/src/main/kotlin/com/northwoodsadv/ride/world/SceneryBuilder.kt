@@ -73,6 +73,7 @@ class SceneryBuilder(
     fun build(): Scenery {
         val near = BooleanArray(roads.size) { nearRoute(roads[it]) }
         findJunctions()
+        gradeJunctions()
         junctionSigns()
         val realBuildings = osm.buildings.isNotEmpty()
         if (realBuildings) osmBuildings()
@@ -87,7 +88,71 @@ class SceneryBuilder(
             signs(ri, r)
         }
         erratics()
+        clearRoads()
         return Scenery(props, runs, landmarks, junctions)
+    }
+
+    /**
+     * Last check: nothing solid may stand on any road (the map's footprints and the roads drawn
+     * from it don't always agree), and no driveway may run through someone else's house.
+     */
+    private fun clearRoads() {
+        props.removeAll { it.kind.solid && !footprintClear(it.x, it.y, it.hx, it.hz, it.heading, 0.4) }
+        val solids = props.filter { it.kind.solid }
+        val sc = Scenery(solids, emptyList(), emptyList(), emptyList())
+        driveways.removeAll { d ->
+            val keep = d.line.length - 5
+            var blocked = false
+            var s = 0.0
+            while (s < keep && !blocked) { d.line.pointAt(s, p); if (sc.solidAt(p[0], p[1], 1.6) != null) blocked = true; s += 1.5 }
+            // ... and none to a house that was taken away.
+            d.line.pointAt(d.line.length, p)
+            blocked || sc.solidAt(p[0], p[1], 6.0) == null
+        }
+        // Mailboxes only where a driveway still meets the road.
+        val mouthsLeft = driveways.map { doubleArrayOf(it.line.xs[0], it.line.ys[0]) }
+        props.removeAll { m -> m.kind == PropKind.MAILBOX && mouthsLeft.none { (it[0] - m.x) * (it[0] - m.x) + (it[1] - m.y) * (it[1] - m.y) < 64.0 } }
+    }
+
+    /** True if an oriented footprint keeps [margin] m from every road edge (edges sampled every ~2 m). */
+    private fun footprintClear(x: Double, y: Double, hx: Double, hz: Double, heading: Double, margin: Double): Boolean {
+        val c = cos(heading); val s = sin(heading)
+        val nu = max(1, (hx / 1.0).toInt()); val nv = max(1, (hz / 1.0).toInt())
+        for (i in -nu..nu) for (j in -nv..nv) {
+            if (i != -nu && i != nu && j != -nv && j != nv && !(i == 0 && j == 0)) continue // edges and centre
+            val u = hx * i / nu; val v = hz * j / nv
+            if (ground.roadClearance(x + u * c - v * s, y + u * s + v * c) < margin) return false
+        }
+        return true
+    }
+
+    /**
+     * Where roads meet, the lesser ones are graded to the main road's level (each road's profile
+     * is smoothed on its own, so otherwise they'd meet with a step, a hump or a trench). Roads
+     * that end on another are already joined by [Road.connectAll]; this catches crossings.
+     */
+    private fun gradeJunctions() {
+        val o = DoubleArray(2)
+        for (j in junctions) {
+            val topRank = j.arms.maxOf { it.rank }
+            val mains = j.arms.filter { it.rank == topRank }.map { roads[it.road] }.distinct()
+            val mainName = mains.first().spec.name
+            for (ri in j.arms.map { it.road }.distinct()) {
+                val r = roads[ri]
+                // The main road's own pieces carry straight through; only side roads are graded.
+                if (r in mains && (r.spec.name == mainName || mains.size == 1)) continue
+                val sr = projectS(r, j.x, j.y)
+                r.line.pointAt(sr, p)
+                // Its level where this road meets the main road's surface.
+                var h = Double.NaN; var bestD = Double.MAX_VALUE
+                for (m in mains) {
+                    if (m === r) continue
+                    m.line.project(p[0], p[1], 0.0, Double.MAX_VALUE, o)
+                    if (o[1] < bestD) { bestD = o[1]; h = m.heightAt(o[0]) }
+                }
+                if (!h.isNaN()) r.pin(sr, h, 35.0)
+            }
+        }
     }
 
     // --- helpers ---------------------------------------------------------------------------
@@ -356,7 +421,7 @@ class SceneryBuilder(
                 heading = opts.minByOrNull { abs(angleDiff(it, toRoad)) }!!
                 if (abs(angleDiff(heading, ang)) > 0.1 && abs(abs(angleDiff(heading, ang)) - PI) > 0.1) { val t = hu; hu = hv; hv = t }
             }
-            if (ground.roadClearance(cx, cy) < min(hu, hv) * 0.5) continue // mapped over a road
+            if (!footprintClear(cx, cy, hu, hv, heading, 0.5)) continue // overlaps a road as drawn here
             val seed = (b.id xor (b.id ushr 32)).toInt()
             val levels = tags["building:levels"]?.toDoubleOrNull()
             val h = when (kind) {
@@ -444,9 +509,20 @@ class SceneryBuilder(
             xs[k] = bx; ys[k] = by
         }
         val line = Polyline(xs, ys).resample(2.0)
+        // No driveway up a cliff, or across another road.
+        val rise = abs(elevation.height(ex, ey) - r.heightAt(s))
+        if (rise > 0.18 * line.length + 0.5) return
+        var t = 4.0
+        while (t < line.length) {
+            line.pointAt(t, p)
+            if (!ground.nearestRoadHit(p[0], p[1], 30.0, hit) || hit.line != ri) { if (ground.roadClearance(p[0], p[1]) < 2.5) return }
+            t += 2.0
+        }
         val paved = r.spec.surface.isPaved && Noise.rand(ri, driveways.size, 41) < 0.35
         val spec = RoadSpec(RoadKind.SERVICE, if (paved) Surface.ASPHALT_WORN else Surface.GRAVEL_PACKED, 3.0, 0.12, null)
-        driveways += Road(DRIVEWAY_ID - driveways.size, spec, line, elevation)
+        val dw = Road(DRIVEWAY_ID - driveways.size, spec, line, elevation)
+        dw.pin(0.0, r.heightAt(s), 20.0) // meets the road level, then follows the yard
+        driveways += dw
         mouthCells.getOrPut(Scenery.key(c32(start[0]), c32(start[1]))) { ArrayList() } += doubleArrayOf(start[0], start[1])
         // Mailbox on the right of the mouth as you arrive.
         val mb = at(r, s + 3.2 * side, side * (r.halfWidth + ground.shoulder(r) + 0.6), DoubleArray(3))
@@ -542,6 +618,7 @@ class SceneryBuilder(
 
     private fun siteOk(ri: Int, x: Double, y: Double, hx: Double, hz: Double, heading: Double, maxDrop: Double = 3.0, clear: Double = 6.0): Boolean =
         dryLand(x, y) && besideOwn(ri, x, y, clear) && free(x, y, hx, hz, heading) && flatEnough(x, y, hx, hz, heading, maxDrop) &&
+            footprintClear(x, y, hx, hz, heading, 2.0) &&
             !nearJunction(x, y, 30.0) && ground.landcover.at(x, y) != Landcover.ROCK
 
     private fun fenceAlong(r: Road, s0: Double, s1: Double, lat: Double, kind: RunKind, seed: Int) {

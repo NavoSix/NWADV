@@ -64,6 +64,12 @@ class Ground(
         RoadKind.GRAVEL -> 0.8; RoadKind.CLASS_VI -> 0.4; RoadKind.TRAIL -> 0.2
     }
 
+    /** Which road's surface wins where two overlap: bigger roads, then mapped over GPX-only. */
+    private fun priority(r: Road) = when (r.spec.kind) {
+        RoadKind.HIGHWAY -> 6; RoadKind.MAJOR -> 5; RoadKind.MINOR -> 4; RoadKind.GRAVEL -> 3
+        RoadKind.SERVICE -> 2; RoadKind.CLASS_VI -> 1; RoadKind.TRAIL -> 0
+    } * 2 + if (r.id >= 0) 1 else 0
+
     private fun influence(r: Road) = r.halfWidth + shoulder(r) + EARTHWORK + 0.5
 
     /** Distance from (e, n) to the edge of the nearest road (negative = on the road). */
@@ -138,9 +144,12 @@ class Ground(
         val cnt = roadIndex.nearestPerLine(e, n, maxInfluence, hits)
         var sumW = 0.0; var sumH = 0.0; var maxW = 0.0; var best = -1; var bestD = Double.MAX_VALUE
         var cut = 0.0; var rock = 0.0
+        var flats = 0
+        var topPr = -1; var topDepth = 0.0; var topH = 0.0
         for (k in 0 until cnt) {
             val h = hits[k]; val r = roads[h.line]
             val flat = r.halfWidth + shoulder(r)
+            if (h.dist <= flat + 1.8) flats++
             if (h.dist > flat + EARTHWORK) continue
             val bank = r.bankAt(h.along)
             // A banked bend is one tilted plane; the crown only shows on the straights.
@@ -160,6 +169,13 @@ class Ground(
             val ew = terrain + (roadH - terrain) * w
             val v = (w * w).let { it * it }.let { it * it }
             sumW += v; sumH += v * ew
+            // On a road's surface the most important road there sets the level, taking over from
+            // 1.5 m outside its edge to 2.5 m in: a side road (or a GPX corner cut) running onto a
+            // main road meets it flush instead of averaging with it, or with its fill slope.
+            if (h.dist <= flat + 1.5) {
+                val pr = priority(r); val depth = flat - h.dist
+                if (pr > topPr || (pr == topPr && depth > topDepth)) { topPr = pr; topDepth = depth; topH = roadH }
+            }
             if (w > maxW) maxW = w
             if (dh > 0.3 && w < 1 && w > 0) {
                 val c = Noise.smoothstep(0.3, 1.2, dh) * Noise.smoothstep(0.0, 0.15, w) * Noise.smoothstep(1.0, 0.9, w)
@@ -171,13 +187,15 @@ class Ground(
         var bestRoad: Road? = null
         if (sumW > 0) {
             out.height = sumH / sumW
+            if (topPr >= 0) out.height += (topH - out.height) * Noise.smoothstep(-1.5, 2.5, topDepth)
             out.roadBlend = maxW
             val h = hits[best]; bestRoad = roads[h.line]
             out.road = h.line; out.lateral = h.lateral; out.along = h.along; out.roadHeading = h.heading
             val r = bestRoad
             val ad = h.dist
             // Roadside ditch (maintained roads only).
-            if (!r.spec.isClassVI && !r.spec.bridge && terrain > out.height - 0.3) {
+            // (Not where another road or a driveway crosses it: that's piped under, not dug out.)
+            if (!r.spec.isClassVI && !r.spec.bridge && terrain > out.height - 0.3 && flats < 2) {
                 val c = r.halfWidth + shoulder(r) + 1.1
                 val depth = if (r.spec.kind == RoadKind.HIGHWAY) 0.7 else 0.45
                 out.height -= depth * gauss((ad - c) / 0.8)

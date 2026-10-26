@@ -73,13 +73,16 @@ class WorldBuilder(private val cache: DiskCache) {
 
         progress.update("Building roads", 0.2f)
         val roads = ArrayList<Road>()
+        val pieces = ArrayList<Triple<Long, RoadSpec, Polyline>>()
         for (w in osm.ways) {
             val spec = RoadClassifier.classify(w.tags) ?: continue
             val xs = DoubleArray(w.points.size) { proj.east(w.points[it].lon) }
             val ys = DoubleArray(w.points.size) { proj.north(w.points[it].lat) }
             val rounded = Polyline(xs, ys).rounded()
-            for (line in Road.splitLong(rounded.xs, rounded.ys)) if (line.length > 1.0) roads += Road(w.id, spec, line, elevation)
+            for (line in Road.splitLong(rounded.xs, rounded.ys)) if (line.length > 1.0) pieces += Triple(w.id, spec, line)
         }
+        val carryOn = continuations(pieces.map { it.third })
+        for ((k, pc) in pieces.withIndex()) roads += Road(pc.first, pc.second, pc.third, elevation, carryOn[k].first, carryOn[k].second)
         val osmRoadCount = roads.size
 
         // GPX sections with no mapped road nearby become trails (unmapped Class VI, logging roads...).
@@ -101,6 +104,9 @@ class WorldBuilder(private val cache: DiskCache) {
         if (roads.size > osmRoadCount && osmRoadCount > 0) {
             notes += "Parts of your track aren't on any mapped road; they're ridden as unmaintained trail."
         }
+
+        Road.connectAll(roads)
+        Road.flushWithMapped(roads) { probe.shoulder(it) }
 
         // --- water and land cover ---------------------------------------------------------------
         progress.update("Streams, lakes and fields", 0.8f)
@@ -161,6 +167,63 @@ class WorldBuilder(private val cache: DiskCache) {
 
     companion object {
         /**
+         * For each line, where its road carries on past its start and its end: the line that
+         * continues from that end (an endpoint within 1.5 m, heading on within 50 degrees),
+         * followed for up to ~90 m across further pieces, as a polyline leading away from the end.
+         */
+        fun continuations(lines: List<Polyline>): List<Pair<Polyline?, Polyline?>> {
+            val cell = 4.0
+            val ends = HashMap<Long, MutableList<Int>>() // code = line * 2 + end
+            fun key(x: Double, y: Double) = (kotlin.math.floor(x / cell).toLong() shl 32) or (kotlin.math.floor(y / cell).toLong() and 0xffffffffL)
+            fun endPt(code: Int): DoubleArray { val l = lines[code / 2]; val k = if (code % 2 == 0) 0 else l.size - 1; return doubleArrayOf(l.xs[k], l.ys[k]) }
+            // Heading pointing away from the line at that end (outward).
+            fun outward(code: Int): Double {
+                val l = lines[code / 2]
+                val a = l.pointAt(if (code % 2 == 0) 0.0 else l.length, DoubleArray(3))
+                val b = l.pointAt(if (code % 2 == 0) minOf(8.0, l.length) else maxOf(0.0, l.length - 8.0), DoubleArray(3))
+                return atan2(a[1] - b[1], a[0] - b[0])
+            }
+            for (c in 0 until lines.size * 2) { val e = endPt(c); ends.getOrPut(key(e[0], e[1])) { ArrayList() } += c }
+            fun next(code: Int): Int? {
+                val e = endPt(code); val out = outward(code)
+                var best: Int? = null; var bestA = Math.toRadians(50.0)
+                for (dx in -1..1) for (dy in -1..1) {
+                    val list = ends[key(e[0] + dx * cell, e[1] + dy * cell)] ?: continue
+                    for (c in list) {
+                        if (c / 2 == code / 2) continue
+                        val o = endPt(c)
+                        if (kotlin.math.hypot(o[0] - e[0], o[1] - e[1]) > 1.5) continue
+                        // Going into the other line from its end is the reverse of its outward heading.
+                        var d = (outward(c) + PI) - out
+                        while (d > PI) d -= 2 * PI; while (d < -PI) d += 2 * PI
+                        if (abs(d) < bestA) { bestA = abs(d); best = c }
+                    }
+                }
+                return best
+            }
+            fun walk(code: Int): Polyline? {
+                val xs = ArrayList<Double>(); val ys = ArrayList<Double>()
+                val e = endPt(code); xs += e[0]; ys += e[1]
+                var at = next(code) ?: return null
+                var len = 0.0; var hops = 0
+                while (hops < 4 && len < 90.0) {
+                    val l = lines[at / 2]
+                    val idx = if (at % 2 == 0) (0 until l.size) else (l.size - 1 downTo 0)
+                    for (k in idx) {
+                        val dl = kotlin.math.hypot(l.xs[k] - xs.last(), l.ys[k] - ys.last())
+                        if (dl < 1e-6) continue
+                        xs += l.xs[k]; ys += l.ys[k]; len += dl
+                        if (len > 90.0) break
+                    }
+                    hops++
+                    at = next(at xor 1) ?: break
+                }
+                return if (xs.size >= 2) Polyline(xs.toDoubleArray(), ys.toDoubleArray()) else null
+            }
+            return lines.indices.map { walk(it * 2) to walk(it * 2 + 1) }
+        }
+
+        /**
          * Index ranges of a GPX line (evenly resampled) that are NOT riding along a mapped
          * road. Being near a road isn't enough: the track has to run alongside it (within ~10 m
          * and heading the same way) for at least 80 m. So crossing a road, or passing close to
@@ -188,16 +251,6 @@ class WorldBuilder(private val cache: DiskCache) {
                 var j = i
                 while (j < n && follows[j]) j++
                 if (j - i < (80.0 / spacing).toInt()) for (k in i until j) follows[k] = false
-                i = j
-            }
-            // Short stretches off the mapped roads between two that follow them are the track
-            // cutting a junction corner, not a road of their own.
-            i = 0
-            while (i < n) {
-                if (follows[i]) { i++; continue }
-                var j = i
-                while (j < n && !follows[j]) j++
-                if (i > 0 && j < n && (j - i) * spacing < 40.0) for (k in i until j) follows[k] = true
                 i = j
             }
             val out = ArrayList<IntRange>()

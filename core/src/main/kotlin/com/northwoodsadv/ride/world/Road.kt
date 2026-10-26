@@ -19,7 +19,15 @@ import kotlin.math.floor
  * cross-section: a cut bank where it was dug into the hillside, a fill slope where it was built
  * up, with stretches blasted through ledge as near-vertical rock cuts.
  */
-class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elevation) {
+class Road(
+    val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elevation,
+    /**
+     * Where the road carries on beyond its ends (the next way of the same road in the map), as
+     * lines leading away from its start and its end: the profile is smoothed over that ground
+     * too, so pieces of one road meet at the same height.
+     */
+    before: Polyline? = null, after: Polyline? = null,
+) {
     val seed = (id xor (id ushr 32)).toInt() * 31 + 7
     val halfWidth = spec.width / 2
     private val profile: FloatArray
@@ -27,14 +35,26 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
 
     init {
         val n = floor(line.length / STEP).toInt() + 2
-        val raw = DoubleArray(n)
         val tmp = DoubleArray(3)
-        for (i in 0 until n) { line.pointAt(i * STEP, tmp); raw[i] = elevation.height(tmp[0], tmp[1]) }
         val window = when (spec.kind) {
             RoadKind.HIGHWAY -> 70.0; RoadKind.MAJOR -> 55.0; RoadKind.MINOR -> 40.0
             RoadKind.SERVICE -> 24.0; RoadKind.GRAVEL -> 30.0; RoadKind.CLASS_VI -> 24.0; RoadKind.TRAIL -> 16.0
         }
+        // Samples run on past the ends along the continuing road, then are cropped after smoothing.
+        val n0 = before?.let { floor(minOf(it.length, window * 1.2) / STEP).toInt() } ?: 0
+        val n1 = after?.let { floor(minOf(it.length, window * 1.2) / STEP).toInt() } ?: 0
+        val raw = DoubleArray(n0 + n + n1)
+        for (i in raw.indices) {
+            val sPos = (i - n0) * STEP
+            when {
+                sPos < 0 -> before!!.pointAt(-sPos, tmp)
+                i >= n0 + n -> after!!.pointAt(sPos - line.length, tmp)
+                else -> line.pointAt(sPos, tmp)
+            }
+            raw[i] = elevation.height(tmp[0], tmp[1])
+        }
         var smooth = boxFilter(boxFilter(raw, (window / STEP / 2).toInt()), (window / STEP / 2).toInt())
+        smooth = smooth.copyOfRange(n0, n0 + n)
         if (spec.bridge || spec.tunnel) {
             val a = smooth.first(); val b = smooth.last()
             smooth = DoubleArray(n) { a + (b - a) * it / (n - 1).coerceAtLeast(1) }
@@ -72,6 +92,21 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
         return bank[i] * (1 - t) + bank[i + 1] * t
     }
 
+    /**
+     * Grades the road to height [h] at [s], easing back into its own profile over [reach] metres
+     * either side: where a side road or driveway meets another road they are built to meet at the
+     * same level, not with a step or a hump between their two smoothed profiles.
+     */
+    fun pin(s: Double, h: Double, reach: Double = 30.0) {
+        if (spec.bridge || spec.tunnel) return
+        for (i in profile.indices) {
+            val d = abs(i * STEP - s)
+            if (d >= reach) continue
+            val k = 1 - Noise.smoothstep(reach * 0.25, reach, d)
+            profile[i] = (profile[i] + (h - profile[i]) * k).toFloat()
+        }
+    }
+
     /** 0..1: how much of the cut face at s is blasted ledge rather than soil (maintained roads only). */
     fun rockCut(s: Double): Double =
         if (spec.isClassVI) 0.0 else Noise.smoothstep(0.66, 0.76, Noise.value1(s / 90, seed + 60))
@@ -102,8 +137,93 @@ class Road(val id: Long, val spec: RoadSpec, val line: Polyline, elevation: Elev
         m
     }
 
+    /** Short pieces (bridges, the bit of road between two junctions) run straight between the heights at their ends. */
+    private fun spanTo(h0: Double?, h1: Double?) {
+        val n = profile.size
+        val a = h0 ?: profile[0].toDouble(); val b = h1 ?: profile[n - 1].toDouble()
+        for (i in 0 until n) profile[i] = (a + (b - a) * i / (n - 1).coerceAtLeast(1)).toFloat()
+    }
+
     companion object {
         const val STEP = 4.0
+
+        /**
+         * Roads that join end to end, or end on another road, are graded to meet at the same
+         * height. OpenStreetMap splits a road into separate ways at junctions, bridges and
+         * changes of surface, and each way's profile is smoothed on its own, so without this
+         * they would meet with steps and humps. The longer road wins (it's smoothed over more
+         * ground); pieces shorter than [SHORT] are re-graded straight between their ends.
+         */
+        fun connectAll(roads: List<Road>) {
+            if (roads.size < 2) return
+            val idx = SegmentIndex(roads.map { it.line }, DoubleArray(roads.size) { 3.0 }, 16.0)
+            val hits = Array(16) { SegmentIndex.Hit() }
+            for (r in roads.sortedByDescending { it.line.length }) {
+                val ends = arrayOfNulls<Double>(2)
+                for (end in 0..1) {
+                    val k = if (end == 0) 0 else r.line.size - 1
+                    val cnt = idx.nearestPerLine(r.line.xs[k], r.line.ys[k], 2.5, hits)
+                    var best: Road? = null; var bestS = 0.0
+                    for (q in 0 until cnt) {
+                        val o = roads[hits[q].line]
+                        if (o === r || o.line.length <= r.line.length) continue
+                        if (best == null || o.line.length > best.line.length) { best = o; bestS = hits[q].along }
+                    }
+                    if (best != null) ends[end] = best.heightAt(bestS)
+                }
+                if (ends[0] == null && ends[1] == null) continue
+                if (r.line.length < SHORT || r.spec.bridge) r.spanTo(ends[0], ends[1])
+                else {
+                    ends[0]?.let { r.pin(0.0, it, 30.0) }
+                    ends[1]?.let { r.pin(r.line.length, it, 30.0) }
+                }
+            }
+        }
+
+        private const val SHORT = 70.0
+
+        /**
+         * GPX-only stretches (ids below zero) that run along or across mapped roads take those
+         * roads' level where they overlap them, and run straight between: the track overlaps the
+         * roads it joins and cuts junction corners, and must meet them flush.
+         */
+        fun flushWithMapped(roads: List<Road>, shoulder: (Road) -> Double) {
+            val mapped = roads.filter { it.id >= 0 }
+            if (mapped.isEmpty()) return
+            val idx = SegmentIndex(mapped.map { it.line }, DoubleArray(mapped.size) { mapped[it].halfWidth + shoulder(mapped[it]) + 3.0 }, 24.0)
+            val hits = Array(16) { SegmentIndex.Hit() }
+            val p = DoubleArray(3)
+            for (r in roads) {
+                if (r.id >= 0 || r.spec.bridge) continue
+                val n = r.profile.size
+                val target = DoubleArray(n) { Double.NaN }
+                for (i in 0 until n) {
+                    r.line.pointAt(i * STEP, p)
+                    val cnt = idx.nearestPerLine(p[0], p[1], 30.0, hits)
+                    var bestD = Double.MAX_VALUE
+                    for (q in 0 until cnt) {
+                        val m = mapped[hits[q].line]
+                        val over = hits[q].dist - (m.halfWidth + shoulder(m) + 1.5)
+                        if (over <= 0 && over < bestD) { bestD = over; target[i] = m.heightAt(hits[q].along) }
+                    }
+                }
+                var any = false
+                for (i in 0 until n) if (!target[i].isNaN()) { r.profile[i] = target[i].toFloat(); any = true }
+                if (!any) continue
+                // Straight across the gaps between overlaps (a corner cut); free ends keep their own.
+                var i = 0
+                while (i < n) {
+                    if (!target[i].isNaN()) { i++; continue }
+                    var j = i
+                    while (j < n && target[j].isNaN()) j++
+                    if (i > 0 && j < n) {
+                        val a = target[i - 1]; val b = target[j]
+                        for (k in i until j) r.profile[k] = (a + (b - a) * (k - i + 1) / (j - i + 1)).toFloat()
+                    }
+                    i = j
+                }
+            }
+        }
         /** Steepest bank on a public road (8%) and a little extra on old built-up curves. */
         const val MAX_BANK = 0.08
 

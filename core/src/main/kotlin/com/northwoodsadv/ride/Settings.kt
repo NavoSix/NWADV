@@ -19,6 +19,9 @@ class Settings {
     var season = runCatching { Season.valueOf(prefs.getString("season", Season.SUMMER.name)) }.getOrDefault(Season.SUMMER)
     /** Which bike from [com.northwoodsadv.ride.bikes.Bikes] to ride. */
     var bikeId = prefs.getString("bike", com.northwoodsadv.ride.bikes.Bikes.all.first().id)
+    /** Chosen paint scheme for a bike (by bike id), or null for its first. */
+    fun paint(bikeId: String): String? = prefs.getString("paint.$bikeId", null)
+    fun setPaint(bikeId: String, paintId: String) { prefs.putString("paint.$bikeId", paintId); prefs.flush() }
     var camera = runCatching { CameraMode.valueOf(prefs.getString("camera", CameraMode.CHASE.name)) }.getOrDefault(CameraMode.CHASE)
     val assists = Assists(
         steerMode = runCatching { SteerMode.valueOf(prefs.getString("steerMode", SteerMode.LEAN.name)) }.getOrDefault(SteerMode.LEAN),

@@ -23,6 +23,7 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         ui.resize(Gdx.graphics.width, Gdx.graphics.height)
         // Development: choose the bike / open the garage from the desktop command line.
         System.getProperty("nwadv.bike")?.let { settings.bikeId = it }
+        System.getProperty("nwadv.paint")?.let { settings.setPaint(settings.bikeId, it) }
         val pending = platform.takePendingGpx()
         when {
             System.getProperty("nwadv.garage") != null -> setScreen(com.northwoodsadv.ride.screens.BikeSelectScreen(this))

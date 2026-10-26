@@ -42,7 +42,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private val shader = WorldShader.create()
     private val baseH = world.ground.height(world.spawnX, world.spawnY, false)
     private val chunks = ChunkManager(ChunkBuilder(world.ground, baseH, settings.season), if (Gdx.app.type == com.badlogic.gdx.Application.ApplicationType.Desktop) 3 else 2)
-    private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE))
+    private val bikeRenderer = BikeRenderer(spec, model.look(com.northwoodsadv.ride.render.Detail.RIDE, settings.paint(model.id)))
     // In the helmet view the moving map is shown on the bike's own phone / GPS screen.
     private val navTex: com.badlogic.gdx.graphics.glutils.FrameBuffer? = bikeRenderer.navScreen?.let { ns ->
         val long = 512f

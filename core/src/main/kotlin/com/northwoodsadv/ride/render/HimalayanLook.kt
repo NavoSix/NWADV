@@ -1,11 +1,33 @@
 package com.northwoodsadv.ride.render
 
 import com.northwoodsadv.ride.physics.BikeSpec
+import com.northwoodsadv.ride.world.Noise
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Donovan's Royal Enfield Himalayan 411 in Rock Red, as set up: tall clear touring screen over
+ * Royal Enfield's factory paint schemes for the Himalayan 411 (and the Scram's White Flame), as
+ * colours for the tank, its stripe and, for Pine Green, a camouflage over tank, side panels and
+ * fenders. [id] is what settings store.
+ */
+enum class HimalayanPaint(val id: String, val label: String, val tankFront: Int, val tankRear: Int, val stripe: Int, val camo: Boolean = false) {
+    /** Red over gloss black, the bike as Donovan has it. */
+    ROCK_RED("rock-red", "Rock Red", 0xb3121a, 0x121214, 0x86888c),
+    /** Two-tone lake blue over white. */
+    LAKE_BLUE("lake-blue", "Lake Blue", 0x2c6aa0, 0xe9e9e4, 0x86888c),
+    /** The Scram 411's white with red accents. */
+    WHITE_FLAME("white-flame", "White Flame", 0xefefea, 0xb81e1c, 0x2a2a2c),
+    /** Woodland camouflage on the tank, side panels and fenders. */
+    PINE_GREEN("pine-green", "Pine Green", 0x3c5236, 0x3c5236, 0x2c3a28, camo = true);
+
+    companion object {
+        fun byId(id: String?) = entries.firstOrNull { it.id == id } ?: ROCK_RED
+    }
+}
+
+/**
+ * Donovan's Royal Enfield Himalayan 411 (Rock Red as Donovan has it; other factory paint
+ * schemes via [HimalayanPaint]), as set up: tall clear touring screen over
  * the silver headlight cowl, phone mount above the round speedo, Tusk handguards, braced bars,
  * black tank guards with Royal Enfield plates, engine crash bars and skid plate, black pannier
  * frames and rear rack (no boxes), knobby tyres on black spoked rims, the stock muffler with its
@@ -15,7 +37,7 @@ import kotlin.math.sin
  * bike never looks hollow; [Detail.SHOWROOM] adds the small stuff: cables and hoses, bolts,
  * gaiter ribs, shock spring, chain links, gauge needles, levers and stand, and rounder surfaces.
  */
-class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
+class HimalayanLook(private val detail: Detail = Detail.RIDE, private val paint: HimalayanPaint = HimalayanPaint.ROCK_RED) : BikeLook {
     // Trail 111 mm at 26.5 deg rake: the steering axis meets the ground 0.111 m ahead of the
     // front contact patch, and the head sits 0.95 m up that line.
     override val headX = 0.43f
@@ -33,7 +55,8 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     private val ls = if (hi) 20 else 12
     private val ts = if (hi) 12 else 7
 
-    private val red = MeshBuilder.color(0xb3121a)
+    private val tankFront = MeshBuilder.color(paint.tankFront)
+    private val tankRear = MeshBuilder.color(paint.tankRear)
     private val gloss = MeshBuilder.color(0x121214)
     private val frame = MeshBuilder.color(0x1b1b1c)
     private val engine = MeshBuilder.color(0x262628)
@@ -65,6 +88,36 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     private val screenGlass = MeshBuilder.color(0.80f, 0.86f, 0.90f, 0.28f)
 
     private fun st(x: Float, cy: Float, hy: Float, hz: Float) = floatArrayOf(x, cy, hy, hz)
+
+    /**
+     * Bodywork: with a camouflage paint, every triangle [block] adds (all built from separate
+     * flat triangles) is recoloured from a blotch pattern at its centre.
+     */
+    private inline fun MeshBuilder.bodywork(block: MeshBuilder.() -> Unit) {
+        val from = vertCount
+        block()
+        if (!paint.camo) return
+        val v = verts
+        var i = from
+        while (i + 2 < vertCount) {
+            var cx = 0f; var cy = 0f; var cz = 0f
+            for (k in 0..2) { val o = (i + k) * MeshBuilder.STRIDE; cx += v[o]; cy += v[o + 1]; cz += v[o + 2] }
+            val c = camo(cx / 3, cy / 3, cz / 3)
+            for (k in 0..2) v[(i + k) * MeshBuilder.STRIDE + 6] = c
+            i += 3
+        }
+    }
+
+    /** Woodland camouflage: pine green with dark, olive and sage blotches. */
+    private fun camo(x: Float, y: Float, z: Float): Float {
+        val n = Noise.value2(x * 11.0 + z * 4.0, y * 11.0 - z * 6.0, 31) * 0.7 + Noise.value2(x * 27.0 - z * 9.0, y * 27.0 + z * 7.0, 32) * 0.3
+        return when {
+            n < 0.36 -> CAMO_DARK
+            n < 0.55 -> CAMO_PINE
+            n < 0.7 -> CAMO_OLIVE
+            else -> CAMO_SAGE
+        }
+    }
 
     /** Round tube at this detail level's facet count. */
     private fun MeshBuilder.rod(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, r0: Float, r1: Float, c: Float, end: Float = c) =
@@ -153,10 +206,10 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             m.rod(x, y, 0f, x - 0.004f, y + 0.012f, 0f, 0.045f, 0.045f, MeshBuilder.color(0x4a4a4a))
         } else m.rod(-0.12f, 0.41f, 0f, -0.21f, 0.63f, 0f, 0.042f, 0.042f, MeshBuilder.color(0x4a4a4a))
 
-        // --- tank: red front, black rear, silver stripe, round badges ------------------------
-        m.loft(arrayOf(st(0.50f, 0.85f, 0.05f, 0.08f), st(0.46f, 0.86f, 0.10f, 0.15f), st(0.38f, 0.865f, 0.115f, 0.18f), st(0.29f, 0.87f, 0.11f, 0.18f)), red, ls, 0.55f)
-        m.loft(arrayOf(st(0.30f, 0.87f, 0.115f, 0.185f), st(0.284f, 0.87f, 0.115f, 0.185f)), MeshBuilder.color(0x86888c), ls, 0.55f)
-        m.loft(arrayOf(st(0.285f, 0.87f, 0.11f, 0.181f), st(0.18f, 0.875f, 0.105f, 0.17f), st(0.08f, 0.875f, 0.09f, 0.15f), st(0.02f, 0.87f, 0.06f, 0.12f)), gloss, ls, 0.55f)
+        // --- tank: two-tone front and rear with a stripe between, round badges -----------------
+        m.bodywork { loft(arrayOf(st(0.50f, 0.85f, 0.05f, 0.08f), st(0.46f, 0.86f, 0.10f, 0.15f), st(0.38f, 0.865f, 0.115f, 0.18f), st(0.29f, 0.87f, 0.11f, 0.18f)), tankFront, ls, 0.55f) }
+        m.loft(arrayOf(st(0.30f, 0.87f, 0.115f, 0.185f), st(0.284f, 0.87f, 0.115f, 0.185f)), MeshBuilder.color(paint.stripe), ls, 0.55f)
+        m.bodywork { loft(arrayOf(st(0.285f, 0.87f, 0.11f, 0.181f), st(0.18f, 0.875f, 0.105f, 0.17f), st(0.08f, 0.875f, 0.09f, 0.15f), st(0.02f, 0.87f, 0.06f, 0.12f)), tankRear, ls, 0.55f) }
         for (s in listOf(-1f, 1f)) {
             // Holographic North East Adventure Rally sticker.
             m.discZ(0.40f, 0.89f, s * 0.176f, s * 0.186f, 0.042f, MeshBuilder.color(0xc8c6d8))
@@ -180,8 +233,10 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         // --- side panels with HIMALAYAN lettering (cover the airbox triangle) ---------------
         for (s in listOf(-1f, 1f)) {
             val z = s * 0.136f
-            m.twoSidedTri(0.0f, 0.77f, z, -0.40f, 0.79f, z, -0.28f, 0.58f, z, panel)
-            m.twoSidedTri(0.0f, 0.77f, z, -0.28f, 0.58f, z, -0.06f, 0.43f, z, panel)
+            m.bodywork {
+                twoSidedTri(0.0f, 0.77f, z, -0.40f, 0.79f, z, -0.28f, 0.58f, z, panel)
+                twoSidedTri(0.0f, 0.77f, z, -0.28f, 0.58f, z, -0.06f, 0.43f, z, panel)
+            }
             m.box(-0.15f, 0.66f, s * 0.139f, 0.09f, 0.012f, 0.002f, letters)
         }
 
@@ -326,7 +381,7 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         }
         m.box(-0.79f, 0.92f, 0f, 0.13f, 0.007f, 0.12f, frame)                              // rack plate
         if (hi) for (k in 0 until 4) m.box(-0.70f - k * 0.06f, 0.928f, 0f, 0.012f, 0.002f, 0.08f, MeshBuilder.color(0x0a0a0a))
-        m.loft(arrayOf(st(-0.64f, 0.80f, 0.018f, 0.10f), st(-0.86f, 0.79f, 0.018f, 0.095f), st(-0.96f, 0.70f, 0.015f, 0.075f), st(-1.0f, 0.60f, 0.012f, 0.06f)), gloss, 10, 0.7f)
+        m.bodywork { loft(arrayOf(st(-0.64f, 0.80f, 0.018f, 0.10f), st(-0.86f, 0.79f, 0.018f, 0.095f), st(-0.96f, 0.70f, 0.015f, 0.075f), st(-1.0f, 0.60f, 0.012f, 0.06f)), gloss, 10, 0.7f) }
         m.box(-0.89f, 0.855f, 0f, 0.035f, 0.03f, 0.075f, tail)                             // tail light
         m.box(-1.005f, 0.60f, 0f, 0.004f, 0.055f, 0.09f, plate)                            // NH plate
         m.box(-1.009f, 0.60f, 0f, 0.002f, 0.018f, 0.06f, MeshBuilder.color(0x2a7a4a))
@@ -394,8 +449,10 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         // Upper fender: glossy black, curving over the wheel from the lower clamp (it steers
         // with the fork but doesn't move with the suspension).
         val fr = spec.frontRadius.toFloat() + 0.15f
-        m.arc(ax, ay, fr, 1.22f, 1.92f, 0.07f, 0.008f, gloss, if (hi) 12 else 6)
-        m.arc(ax, ay, fr - 0.012f, 1.27f, 1.88f, 0.05f, 0.012f, gloss, if (hi) 8 else 4)          // stiffening rib
+        m.bodywork {
+            arc(ax, ay, fr, 1.22f, 1.92f, 0.07f, 0.008f, gloss, if (hi) 12 else 6)
+            arc(ax, ay, fr - 0.012f, 1.27f, 1.88f, 0.05f, 0.012f, gloss, if (hi) 8 else 4)          // stiffening rib
+        }
         m.beam(lc[0], lc[1] - 0.02f, -0.05f, lc[0] + 0.02f, lc[1] - 0.06f, 0f, 0.012f, frame)  // mount
         m.beam(lc[0], lc[1] - 0.02f, 0.05f, lc[0] + 0.02f, lc[1] - 0.06f, 0f, 0.012f, frame)
         // Bars on risers, with the chrome crossbar brace.
@@ -433,7 +490,7 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.beam(0f, 0f, -0.11f, 0f, 0f, 0.11f, 0.012f, silver)                                // axle
         m.box(-0.10f, 0.10f, -0.105f, 0.032f, 0.048f, 0.02f, MeshBuilder.color(0xb09a6a))  // gold Bybre caliper (disc on the left)
         // Low fender hugging the tyre.
-        m.arc(0f, 0f, rf + 0.035f, 0.95f, 2.05f, 0.06f, 0.008f, gloss, if (hi) 12 else 6)
+        m.bodywork { arc(0f, 0f, rf + 0.035f, 0.95f, 2.05f, 0.06f, 0.008f, gloss, if (hi) 12 else 6) }
         m.tube(-0.02f, rf + 0.04f, -0.09f, -0.02f, rf + 0.04f, 0.09f, 0.008f, 0.008f, 6, frame, frame)  // fender brace
         m.box(0.0f, -0.02f, 0.092f, 0.012f, 0.03f, 0.004f, amber)                            // fork reflector
         if (hi) {
@@ -467,5 +524,12 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE) : BikeLook {
                 m.box(cos(a) * 0.109f, sin(a) * 0.109f, -0.108f, 0.004f, 0.004f, 0.004f, chain)
             }
         }
+    }
+
+    private companion object {
+        val CAMO_DARK = MeshBuilder.color(0x222c1e)
+        val CAMO_PINE = MeshBuilder.color(0x3c5236)
+        val CAMO_OLIVE = MeshBuilder.color(0x5a5e3a)
+        val CAMO_SAGE = MeshBuilder.color(0x7a8462)
     }
 }

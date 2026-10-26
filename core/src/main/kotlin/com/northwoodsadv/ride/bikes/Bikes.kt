@@ -6,6 +6,10 @@ import com.northwoodsadv.ride.render.BikeLook
 import com.northwoodsadv.ride.render.Detail
 import com.northwoodsadv.ride.render.GenericTwinLook
 import com.northwoodsadv.ride.render.HimalayanLook
+import com.northwoodsadv.ride.render.HimalayanPaint
+
+/** A factory paint scheme to choose in the garage; [swatch]/[swatch2] colour its button. */
+class PaintOption(val id: String, val label: String, val swatch: Int, val swatch2: Int)
 
 /**
  * One rideable motorcycle: its physics, its engine note and how it looks. Club members' bikes
@@ -20,13 +24,18 @@ class BikeModel(
     val blurb: String,
     val spec: BikeSpec,
     val sound: EngineSound,
-    /** The 3D model at a level of detail (finely detailed in the garage, lighter on the road). */
-    val look: (Detail) -> BikeLook,
+    /**
+     * The 3D model at a level of detail (finely detailed in the garage, lighter on the road), in
+     * one of [paints] by id (null or unknown: the first).
+     */
+    val look: (Detail, String?) -> BikeLook,
     /** Headline numbers for the selection screen. */
     val engine: String,
     val power: String,
     /** Short model name for tight spots (e.g. "Himalayan 411"). */
     val shortName: String = name,
+    /** Paint schemes to choose from, the owner's own first; empty if there's no choice. */
+    val paints: List<PaintOption> = emptyList(),
 ) {
     /** "Donovan's Royal Enfield Himalayan 411", or the plain model name for a loaner. */
     val displayName get() = if (owner != null) "$owner's $name" else name
@@ -48,7 +57,7 @@ object Bikes {
         id = "himalayan411",
         name = "Royal Enfield Himalayan 411",
         owner = "Donovan",
-        blurb = "Rock Red, tall screen, Tusk handguards, crash bars, tank guards and racks. A torquey single that thumps up anything slowly.",
+        blurb = "Tall screen, Tusk handguards, crash bars, tank guards and racks. A torquey single that thumps up anything slowly.",
         spec = BikeSpec(
             name = "Royal Enfield Himalayan 411",
             massBike = 207.0,
@@ -91,10 +100,11 @@ object Bikes {
             groundClearanceLean = Math.toRadians(45.0),
         ),
         sound = EngineSound.HIMALAYAN_411,
-        look = { HimalayanLook(it) },
+        look = { detail, paint -> HimalayanLook(detail, HimalayanPaint.byId(paint)) },
         engine = "411 cc single",
         power = "24 hp / 32 N m",
         shortName = "Himalayan 411",
+        paints = HimalayanPaint.entries.map { PaintOption(it.id, it.label, it.tankFront, it.tankRear) },
     )
 
     /** The original stand-in: a generic 100 hp mid-weight adventure twin. */
@@ -105,7 +115,7 @@ object Bikes {
         blurb = "A generic 100 hp parallel twin with long-travel suspension and aluminium panniers.",
         spec = BikeSpec(),
         sound = EngineSound.TWIN_270,
-        look = { GenericTwinLook() },
+        look = { _, _ -> GenericTwinLook() },
         engine = "~900 cc parallel twin",
         power = "100 hp / 104 N m",
     )

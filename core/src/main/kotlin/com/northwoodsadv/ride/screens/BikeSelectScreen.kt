@@ -50,7 +50,11 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         }
     }
 
-    private fun renderer(b: BikeModel) = renderers.getOrPut(b.id) { BikeRenderer(b.spec, b.look(Detail.SHOWROOM)) }
+    private fun paintOf(b: BikeModel) = game.settings.paint(b.id) ?: b.paints.firstOrNull()?.id
+    private fun renderer(b: BikeModel): BikeRenderer {
+        val paint = paintOf(b)
+        return renderers.getOrPut("${b.id}/$paint") { BikeRenderer(b.spec, b.look(Detail.SHOWROOM, paint)) }
+    }
 
     override fun render(delta: Float) {
         val ui = game.ui
@@ -160,6 +164,28 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         ui.text(bike.blurb, px + pw * 0.54f, py - u * 1.5f, Color(0.8f, 0.8f, 0.7f, 1f), Align.left, ui.font, pw * 0.46f, true)
         ui.text("Drag to turn", px + u, py + u * 2.5f, Color(1f, 1f, 1f, 0.6f))
 
+        // Paint schemes along the top of the preview: a swatch of the two tank colours and the name.
+        if (bike.paints.size > 1) {
+            val current = paintOf(bike)
+            val gap = u * 0.6f
+            val bh = u * 4.2f
+            // One row if every name fits beside its swatch, else two.
+            val need = bike.paints.maxOf { ui.textWidth(it.label) } + bh * 0.55f + u * 2f
+            val perRow = if ((pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size >= need) bike.paints.size else (bike.paints.size + 1) / 2
+            val bw = minOf(maxOf(need, u * 12f), (pw - u * 2 - gap * (perRow - 1)) / perRow)
+            for ((k, pt) in bike.paints.withIndex()) {
+                val bx = px + u + (k % perRow) * (bw + gap)
+                val by = py + ph - u - bh - (k / perRow) * (bh + gap)
+                if (ui.button("", bx, by, bw, bh, active = pt.id == current)) game.settings.setPaint(bike.id, pt.id)
+                val sw = bh * 0.55f
+                val sx = bx + u * 0.7f; val sy = by + (bh - sw) / 2
+                ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, Color.WHITE, Align.left, ui.font, bw - sw - u * 1.8f)
+                ui.rect(sx - 2, sy - 2, sw + 4, sw + 4, Color.BLACK)
+                ui.rect(sx, sy + sw / 2, sw, sw / 2, swatch(pt.swatch))
+                ui.rect(sx, sy, sw, sw / 2, swatch(pt.swatch2))
+            }
+        }
+
         val chosen = bike.id == game.settings.bikeId
         val btnW = pw * 0.34f; val btnH = u * 4.6f
         if (ui.button(if (chosen) "Riding this bike" else "Ride this bike", px + pw - btnW, u * 3, btnW, btnH, active = chosen)) {
@@ -168,6 +194,8 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         if (ui.button("Back", u * 3, u * 3, lw * 0.5f, btnH)) game.toMenu()
         ui.endFrame()
     }
+
+    private fun swatch(rgb: Int) = Color(((rgb shr 16) and 255) / 255f, ((rgb shr 8) and 255) / 255f, (rgb and 255) / 255f, 1f)
 
     /** Nominal rim size from the tyre's outer radius (dual-sport tyres add ~8-11 cm to the rim). */
     private fun wheelInches(r: Double, front: Boolean) = (r * 2 - if (front) 0.162 else 0.216) / 0.0254

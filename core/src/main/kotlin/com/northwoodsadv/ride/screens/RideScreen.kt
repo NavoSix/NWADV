@@ -74,7 +74,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var landmark: Landmark? = null
     private var landmarkTimer = 0.0
     private val announced = HashSet<Landmark>()
-    private val achievements = com.northwoodsadv.ride.progress.AchievementTracker(settings)
+    private val achievements = com.northwoodsadv.ride.progress.AchievementTracker(settings, model.id) // only this bike's achievements
     /** Newly unlocked achievements, shown one at a time. */
     private val unlockedQueue = ArrayDeque<com.northwoodsadv.ride.progress.Achievement>()
     private var unlockTimer = 0.0

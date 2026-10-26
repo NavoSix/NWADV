@@ -23,13 +23,13 @@ class Settings : com.northwoodsadv.ride.progress.ProgressStore {
     fun paint(bikeId: String): String? = prefs.getString("paint.$bikeId", null)
     fun setPaint(bikeId: String, paintId: String) { prefs.putString("paint.$bikeId", paintId); prefs.flush() }
 
-    /** A paint that's free or already earned. */
-    fun paintUnlocked(paintId: String?): Boolean =
-        com.northwoodsadv.ride.progress.Achievement.forPaint(paintId)?.let { isUnlocked(it) } ?: true
+    /** A paint of [bikeId] that's free or already earned on that bike. */
+    fun paintUnlocked(bikeId: String, paintId: String?): Boolean =
+        com.northwoodsadv.ride.progress.Achievement.forPaint(bikeId, paintId)?.let { isUnlocked(it) } ?: true
 
     /** The paint to show: the chosen one if it's unlocked, else the bike's first. */
     fun activePaint(bike: com.northwoodsadv.ride.bikes.BikeModel): String? =
-        paint(bike.id)?.takeIf { p -> paintUnlocked(p) && bike.paints.any { it.id == p } } ?: bike.paints.firstOrNull()?.id
+        paint(bike.id)?.takeIf { p -> paintUnlocked(bike.id, p) && bike.paints.any { it.id == p } } ?: bike.paints.firstOrNull()?.id
 
     override fun number(key: String) = prefs.getString(key, "0").toDoubleOrNull() ?: 0.0
     override fun setNumber(key: String, v: Double) { prefs.putString(key, v.toString()) }

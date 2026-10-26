@@ -121,7 +121,8 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
     Scram 411 (white and red), and Pine Green (camouflage on the tank, side panels and fenders).
     Each is unlocked by an achievement on the road; what it takes stays a secret until you've
     done it, when a notice tells you. Pick unlocked paints in the garage; the choice is
-    remembered for each bike. (Auto-ride doesn't count.)
+    remembered for each bike. Only riding the Himalayan itself counts (not auto-ride). Future
+    bikes get their own paints, earned only on that bike.
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
   - 207 kg with the accessories.
   - 21"/17" spoked wheels on knobbies, 200/180 mm travel, 26.5 deg rake.

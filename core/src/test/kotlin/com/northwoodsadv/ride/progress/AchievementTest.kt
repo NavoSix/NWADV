@@ -22,7 +22,7 @@ class AchievementTest {
     }
 
     @Test fun aMileOfWaterUnlocksLakeBlue() {
-        val store = MapStore(); val t = AchievementTracker(store)
+        val store = MapStore(); val t = AchievementTracker(store, "himalayan411")
         assertTrue(ride(t, 300.0, 5.0, water = true).isEmpty(), "1.5 km isn't a mile yet")
         assertEquals(listOf(Achievement.WATERBORNE), ride(t, 30.0, 5.0, water = true))
         assertTrue(ride(t, 100.0, 5.0, water = true).isEmpty(), "only once")
@@ -30,14 +30,14 @@ class AchievementTest {
 
     @Test fun progressSurvivesBetweenRides() {
         val store = MapStore()
-        ride(AchievementTracker(store), 200.0, 5.0, water = true)
-        AchievementTracker(store).save().let {}
-        assertEquals(listOf(Achievement.WATERBORNE), ride(AchievementTracker(store), 130.0, 5.0, water = true))
+        ride(AchievementTracker(store, "himalayan411"), 200.0, 5.0, water = true)
+        AchievementTracker(store, "himalayan411").save().let {}
+        assertEquals(listOf(Achievement.WATERBORNE), ride(AchievementTracker(store, "himalayan411"), 130.0, 5.0, water = true))
     }
 
     @Test fun flatOutNeedsThirtySecondsInARow() {
-        val store = MapStore(); val t = AchievementTracker(store)
-        val fast = 80 * AchievementTracker.MILE / 3600 + 0.1
+        val store = MapStore(); val t = AchievementTracker(store, "himalayan411")
+        val fast = Achievement.FLAT_OUT.speed + 0.1
         assertTrue(ride(t, 25.0, fast).isEmpty())
         ride(t, 1.0, 30.0) // backed off: the run starts again
         assertTrue(ride(t, 25.0, fast).isEmpty())
@@ -45,9 +45,23 @@ class AchievementTest {
     }
 
     @Test fun classSixCountsOnlyOnYourOwnRoutes() {
-        val store = MapStore(); val t = AchievementTracker(store)
+        val store = MapStore(); val t = AchievementTracker(store, "himalayan411")
         val miles500 = 500 * AchievementTracker.MILE
         assertTrue(ride(t, miles500 / 20 + 100, 20.0, classVI = true, own = false).isEmpty(), "sample routes don't count")
         assertEquals(listOf(Achievement.LOST_IN_THE_WOODS), ride(t, miles500 / 20 + 100, 20.0, classVI = true, own = true))
+    }
+
+    @Test fun otherBikesDontEarnTheHimalayansPaints() {
+        val store = MapStore(); val t = AchievementTracker(store, "generic-twin")
+        val fast = Achievement.FLAT_OUT.speed + 5
+        assertTrue(ride(t, 60.0, fast, water = true).isEmpty(), "the twin earns nothing for the Himalayan")
+        assertTrue(store.numbers.isEmpty(), "and keeps no Himalayan progress")
+        assertEquals(listOf(Achievement.FLAT_OUT), ride(AchievementTracker(store, "himalayan411"), 31.0, fast))
+    }
+
+    @Test fun paintsBelongToTheirBike() {
+        assertEquals(Achievement.WATERBORNE, Achievement.forPaint("himalayan411", "lake-blue"))
+        assertEquals(null, Achievement.forPaint("himalayan411", "rock-red"))
+        assertEquals(null, Achievement.forPaint("generic-twin", "lake-blue"))
     }
 }

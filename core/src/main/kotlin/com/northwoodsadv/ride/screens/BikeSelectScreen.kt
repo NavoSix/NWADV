@@ -177,7 +177,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
                 val bx = px + u + (k % perRow) * (bw + gap)
                 val by = py + ph - u - bh - (k / perRow) * (bh + gap)
                 // Paints still to be earned: a padlock instead of the swatch, and no hint how.
-                val open = game.settings.paintUnlocked(pt.id)
+                val open = game.settings.paintUnlocked(bike.id, pt.id)
                 if (ui.button("", bx, by, bw, bh, active = pt.id == current, enabled = open) && open) game.settings.setPaint(bike.id, pt.id)
                 val sw = bh * 0.55f
                 val sx = bx + u * 0.7f; val sy = by + (bh - sw) / 2

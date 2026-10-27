@@ -69,6 +69,10 @@ public class AndroidLauncher extends AndroidApplication implements Platform {
         pendingGpx = null;
         return p;
     }
+    /** Saved routes stay in the app's local storage. */
+    @Override
+    public File getSavedRoutesDir() { return null; }
+
 
     @Override
     public File getMapCacheDir() {

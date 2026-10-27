@@ -141,7 +141,8 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
     lights and small fogs below, the LED headlight behind a mesh guard.
   - A 360 camera on a tall pole at the front, a tall stickered screen, a portrait Garmin on the
     left of the bars (the helmet view's map shows on it) and a CarPlay screen over the TFT.
-  - Silver pannier frames with dry bags on the rack, Telelever front, single-sided Paralever
+  - Silver pannier frames with dry bags on the rack and the aluminium tool box in the left
+    frame, black side covers filling out the space under the seat, Telelever front, single-sided Paralever
     with the shaft on the left, cross-spoked 19"/17" wheels on knobbies.
   - 1,254 cc ShiftCam boxer (136 hp, 143 N m), 6-speed, about 265 kg as set up; 0-100 km/h in
     about 4.5 s with a 90 kg rider. A synthesised boxer note until Franco records the real one.

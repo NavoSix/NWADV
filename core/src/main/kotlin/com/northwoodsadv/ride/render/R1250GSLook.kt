@@ -219,6 +219,30 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.tube(-0.97f, 1.0f, -0.24f, -0.97f, 1.0f, 0.24f, 0.075f, 0.075f, ls, bagRed, bagBlack)
         m.box(-0.70f, 1.22f, 0.04f, 0.10f, 0.05f, 0.09f, bagBlack)
         for (k in 0 until 3) m.box(-0.66f - k * 0.12f, 1.07f, 0f, 0.012f, 0.122f, 0.205f, bagBlack)     // straps
+        // Under the seat: the black side covers, the battery and electronics block behind them,
+        // and the undertray running back to the tail, so the bike has the GS's bulk there.
+        m.box(-0.24f, 0.70f, 0f, 0.24f, 0.12f, 0.10f, engineBlack)
+        m.loft(arrayOf(st(-0.50f, 0.80f, 0.06f, 0.10f), st(-0.75f, 0.81f, 0.05f, 0.095f), st(-0.95f, 0.80f, 0.04f, 0.075f)), matte, 10, 0.85f)
+        for (s in listOf(-1f, 1f)) {
+            m.loft(arrayOf(st(0.04f, 0.73f, 0.12f, 0.022f), st(-0.18f, 0.73f, 0.14f, 0.026f), st(-0.42f, 0.78f, 0.10f, 0.026f), st(-0.60f, 0.83f, 0.05f, 0.02f)), black, if (hi) 14 else 8, 0.9f, s * 0.135f)
+            m.box(-0.20f, 0.70f, s * 0.162f, 0.10f, 0.004f, 0.002f, grey)                                 // panel crease
+            if (hi) for (k in 0 until 3) m.cone(-0.06f - k * 0.16f, 0.80f - k * 0.02f, s * 0.162f, 0.006f, 0.006f, 0.003f, 6, bolt)
+        }
+
+        // Aluminium tool box carried inside the left pannier frame, with a black graphic and latches.
+        run {
+            val x = -0.66f; val y = 0.63f; val z = -0.245f
+            m.box(x, y, z, 0.18f, 0.13f, 0.045f, alu)
+            m.box(x, y + 0.135f, z, 0.185f, 0.008f, 0.05f, MeshBuilder.color(0xa4a8ac))               // lid rim
+            val face = z - 0.047f
+            m.box(x - 0.08f, y + 0.02f, face, 0.06f, 0.07f, 0.002f, matte)
+            m.box(x + 0.04f, y - 0.05f, face, 0.08f, 0.04f, 0.002f, matte)
+            m.box(x + 0.11f, y + 0.06f, face, 0.04f, 0.035f, 0.002f, matte)
+            for (k in listOf(-1f, 1f)) m.box(x + k * 0.10f, y + 0.12f, face - 0.004f, 0.015f, 0.012f, 0.003f, MeshBuilder.color(0x2a2a2a))
+            m.beam(x - 0.16f, y - 0.12f, -0.27f, x - 0.16f, y - 0.12f, z + 0.03f, 0.006f, black)          // mounting straps
+            m.beam(x + 0.16f, y - 0.12f, -0.27f, x + 0.16f, y - 0.12f, z + 0.03f, 0.006f, black)
+        }
+
         // Silver pannier frames, no boxes.
         for (s in listOf(-1f, 1f)) {
             val z = 0.27f
@@ -254,6 +278,9 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.beam(pivotX - 0.02f, pivotY - 0.09f, -0.10f, -b + 0.10f, rr - 0.08f, -0.10f, 0.012f, silver)   // torque strut
         m.tube(-b, rr, -0.075f, -b, rr, -0.16f, 0.085f, 0.07f, ls, black, alu)                          // final drive
         m.beam(pivotX, pivotY, -0.12f, pivotX, pivotY, 0.12f, 0.018f, silver)                            // pivot
+        // Hugger over the rear tyre, riding with the swingarm.
+        m.arc(-b, rr, rr + 0.04f, 1.25f, 2.2f, 0.075f, 0.006f, matte, if (hi) 10 else 6)
+        m.beam(-b * 0.45f, (pivotY + rr) / 2 + 0.03f, -0.10f, -b + 0.05f, rr + 0.33f, -0.07f, 0.008f, matte)
     }
 
     override fun glass(m: MeshBuilder, spec: BikeSpec) {

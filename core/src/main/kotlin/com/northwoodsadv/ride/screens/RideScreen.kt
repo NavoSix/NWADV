@@ -115,6 +115,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         System.getProperty("nwadv.startTurn")?.toDoubleOrNull()?.let { bike.reset(bike.x, bike.y, bike.yaw + Math.toRadians(it)) }
         rebase(true)
         banner = if (resumed) "${world.name}\nPicking up where you left off" else world.name; bannerTimer = 4.0
+        // Development: screenshots without the route title and load notes.
+        if (System.getProperty("nwadv.cleanHud") != null) { bannerTimer = 0.0; notesTimer = 0.0 }
     }
 
     private fun rebase(force: Boolean) {
@@ -387,7 +389,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         bannerTimer -= dt
         val msgW = ui.w - gw - u * 12f
         var my = ui.h - u * 8.5f
-        if (autoRide) { ui.text("AUTO-RIDE demo: press Auto to take over", u * 1.5f, my, Ui2.AUTO, Align.left, ui.font, msgW); my -= u * 3f }
+        if (autoRide && System.getProperty("nwadv.cleanHud") == null) { ui.text("AUTO-RIDE demo: press Auto to take over", u * 1.5f, my, Ui2.AUTO, Align.left, ui.font, msgW); my -= u * 3f }
         if (bannerTimer > 0) banner?.let { ui.text(it, 0f, ui.h * 0.66f, Color.WHITE, Align.center, ui.big, ui.w) }
         val lm = landmark
         if (landmarkTimer > 0 && lm != null) {

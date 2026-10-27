@@ -134,6 +134,17 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
     and 4,800 rpm. The game plays one recorded firing cycle per firing, blended between the two
     recordings nearest the current rpm, with the single's natural cycle-to-cycle lope.
   - Ridden with a 90 kg rider, it does 0-100 km/h in about 15 s and tops out near 125 km/h.
+- **Franco's BMW R 1250 GS** in Style Rallye, modelled from Franco's photos:
+  - Blue tank over black shrouds with the red and white flash, the boxer's cylinders out behind
+    silver upper and lower crash bars.
+  - Franco's lights: yellow square pods beside the beak (they glow), round seven-LED driving
+    lights and small fogs below, the LED headlight behind a mesh guard.
+  - A 360 camera on a tall pole at the front, a tall stickered screen, a portrait Garmin on the
+    left of the bars (the helmet view's map shows on it) and a CarPlay screen over the TFT.
+  - Silver pannier frames with dry bags on the rack, Telelever front, single-sided Paralever
+    with the shaft on the left, cross-spoked 19"/17" wheels on knobbies.
+  - 1,254 cc ShiftCam boxer (136 hp, 143 N m), 6-speed, about 265 kg as set up; 0-100 km/h in
+    about 4.5 s with a 90 kg rider. A synthesised boxer note until Franco records the real one.
 - **Mid-weight ADV twin**: the original generic 100 hp stand-in.
 
 ### Recording a bike's engine

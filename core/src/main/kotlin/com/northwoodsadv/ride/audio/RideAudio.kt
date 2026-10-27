@@ -35,6 +35,8 @@ class EngineSound(
     companion object {
         /** 270-degree crank parallel twin: the uneven lope of most mid-weight ADV twins. */
         val TWIN_270 = EngineSound(doubleArrayOf(0.0, 270.0), 90.0, 0.9, 1.0, 0.0075, 0.0035)
+        /** Boxer twin (BMW): even firing every revolution, a deep, smooth burble with a hollow airbox note. */
+        val BOXER = EngineSound(doubleArrayOf(0.0, 360.0), 78.0, 0.8, 1.2, 0.009, 0.0045, pops = 0.6)
         /** Big air-cooled single: one deep thump every other revolution. */
         val SINGLE = EngineSound(doubleArrayOf(0.0), 68.0, 0.75, 1.45, 0.010, 0.005)
         /** Donovan's Himalayan 411, recorded holding idle, 1,900, 2,850, 4,000 and 4,800 rpm. */

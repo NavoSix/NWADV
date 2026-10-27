@@ -7,6 +7,7 @@ import com.northwoodsadv.ride.render.Detail
 import com.northwoodsadv.ride.render.GenericTwinLook
 import com.northwoodsadv.ride.render.HimalayanLook
 import com.northwoodsadv.ride.render.HimalayanPaint
+import com.northwoodsadv.ride.render.R1250GSLook
 
 /** A factory paint scheme to choose in the garage; [swatch]/[swatch2] colour its button. */
 class PaintOption(val id: String, val label: String, val swatch: Int, val swatch2: Int)
@@ -107,6 +108,65 @@ object Bikes {
         paints = HimalayanPaint.entries.map { PaintOption(it.id, it.label, it.tankFront, it.tankRear) },
     )
 
+    /**
+     * BMW R 1250 GS (2019 on), Style Rallye: 1,254 cc ShiftCam boxer twin, 136 hp at 7,750 rpm and
+     * 143 N m at 6,250 rpm, 6-speed, shaft drive, 249 kg wet plus about 16 kg of crash bars,
+     * lights, camera pole, pannier frames, rack and bags. 19"/17" cross-spoked wheels (120/70-19,
+     * 170/60-17), Telelever and Paralever with 210/220 mm travel (Rallye sport suspension),
+     * 1,525 mm wheelbase, 25.7 deg rake, 100.6 mm trail.
+     */
+    val R1250GS = BikeModel(
+        id = "r1250gs",
+        name = "BMW R 1250 GS",
+        owner = "Franco",
+        blurb = "Style Rallye, crash bars, yellow light pods, a 360 camera pole and dry bags. The boxer pulls from anywhere.",
+        spec = BikeSpec(
+            name = "BMW R 1250 GS",
+            massBike = 265.0,
+            massRider = 90.0,
+            wheelbase = 1.525,
+            cgToFront = 0.76,
+            cgHeightSeated = 0.80,
+            cgHeightStanding = 0.93,
+            rollInertia = 42.0,
+            pitchInertia = 128.0,
+            yawInertia = 88.0,
+            frontRadius = 0.325,
+            rearRadius = 0.318,
+            frontWheelInertia = 0.55,
+            rearWheelInertia = 0.90,
+            unsprungFront = 16.0,
+            unsprungRear = 24.0,
+            frontTravel = 0.21,
+            rearTravel = 0.22,
+            // About 30% of the travel as sag with the rider aboard.
+            frontSpring = 27_000.0,
+            rearSpring = 26_300.0,
+            frontCompDamp = 1_200.0,
+            frontRebDamp = 2_150.0,
+            rearCompDamp = 1_300.0,
+            rearRebDamp = 2_300.0,
+            torqueRpm = doubleArrayOf(1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6250.0, 7000.0, 7750.0, 8500.0, 9000.0),
+            torqueNm = doubleArrayOf(80.0, 110.0, 120.0, 128.0, 134.0, 143.0, 139.0, 124.0, 110.0, 96.0),
+            idleRpm = 1000.0,
+            redlineRpm = 9000.0,
+            engineInertia = 0.10,
+            primaryRatio = 1.756,
+            gearRatios = doubleArrayOf(2.438, 1.714, 1.296, 1.059, 0.943, 0.848),
+            finalRatio = 2.91,
+            frontBrakeMax = 1_450.0,
+            rearBrakeMax = 500.0,
+            dragArea = 0.62,
+            // The cylinders (and their bars) touch down before the pegs.
+            groundClearanceLean = Math.toRadians(44.0),
+        ),
+        sound = EngineSound.BOXER,
+        look = { detail, _ -> R1250GSLook(detail) },
+        engine = "1,254 cc boxer twin",
+        power = "136 hp / 143 N m",
+        shortName = "R 1250 GS",
+    )
+
     /** The original stand-in: a generic 100 hp mid-weight adventure twin. */
     val GENERIC_TWIN = BikeModel(
         id = "generic-twin",
@@ -120,7 +180,7 @@ object Bikes {
         power = "100 hp / 104 N m",
     )
 
-    val all = listOf(HIMALAYAN_411, GENERIC_TWIN)
+    val all = listOf(HIMALAYAN_411, R1250GS, GENERIC_TWIN)
 
     fun byId(id: String?) = all.firstOrNull { it.id == id } ?: all.first()
 }

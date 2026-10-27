@@ -44,4 +44,22 @@ class BikeLookTest {
         assertTrue(camo.all { it in green }, "all four camo tones on the bodywork")
         assertTrue(camo.none { it in colours(HimalayanPaint.LAKE_BLUE) }, "no camo on Lake Blue")
     }
+
+    @Test fun r1250gsFitsTheBudget() {
+        val spec = Bikes.R1250GS.spec
+        for (d in Detail.entries) {
+            val look = R1250GSLook(d)
+            val parts = Array(7) { MeshBuilder() }
+            look.chassis(parts[0], spec)
+            look.front(parts[1], spec, spec.cgToFront.toFloat() - look.headX, spec.frontRadius.toFloat() - look.headY)
+            look.frontLower(parts[2], spec, -0.5f, 0.86f)
+            look.wheel(parts[3], spec, true)
+            look.wheel(parts[4], spec, false)
+            look.glass(parts[5], spec)
+            look.swingarm(parts[6], spec)
+            println("r1250gs $d verts ${parts.map { it.vertCount }} (${parts.sumOf { it.vertCount }})")
+            for (p in parts) assertTrue(p.vertCount < 60_000)
+            if (d == Detail.RIDE) assertTrue(parts.sumOf { it.vertCount } < 40_000, "riding model stays light")
+        }
+    }
 }

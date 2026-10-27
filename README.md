@@ -211,7 +211,7 @@ aired-down tyres.
    install. Windows SmartScreen may say "Windows protected your PC" because the app isn't signed:
    click *More info*, then *Run anyway*.
 
-Ride with the keyboard (see Controls) or plug in a game controller. Open your club's GPX files with
+Ride with the keyboard (see Controls). Open your club's GPX files with
 *Load GPX file...*; they're remembered in `%USERPROFILE%\.nwadv`, along with the downloaded map
 data, and your settings and progress are in `%USERPROFILE%\.prefs`.
 

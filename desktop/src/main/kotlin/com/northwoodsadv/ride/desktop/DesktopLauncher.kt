@@ -13,6 +13,8 @@ import java.io.File
 
 class DesktopPlatform(touch: Boolean = false) : Platform {
     override val mapCacheDir = File(System.getProperty("user.home"), ".nwadv/cache").apply { mkdirs() }
+    // In the home folder, so it works wherever the game is installed (Program Files isn't writable).
+    override val savedRoutesDir = File(System.getProperty("user.home"), ".nwadv/saved-routes").apply { mkdirs() }
     override val isTouchDevice = touch
 
     override fun pickGpxFile(onResult: (String?, String?) -> Unit) {

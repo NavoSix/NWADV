@@ -83,7 +83,7 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
 class RouteLibrary(private val game: NwadvGame) {
     class Entry(val title: String, val load: () -> String, val bundled: Boolean)
 
-    private val dir get() = Gdx.files.local("saved-routes")
+    private val dir get() = game.platform.savedRoutesDir?.let { Gdx.files.absolute(it.path) } ?: Gdx.files.local("saved-routes")
 
     fun entries(): List<Entry> {
         val out = ArrayList<Entry>()

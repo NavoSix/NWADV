@@ -202,6 +202,19 @@ aired-down tyres.
 | Map zoom | + / - | M |
 | Auto-ride demo | Auto button | P |
 
+## Playing on Windows
+
+1. On GitHub open *Actions*, pick the latest successful *Build* run, and download the
+   **nwadv-windows** artifact at the bottom of the page (you must be signed in).
+2. Unzip it (GitHub wraps it in a zip; inside is `NorthwoodsADV-windows.zip`, unzip that too).
+3. Open the `NorthwoodsADV` folder and run `NorthwoodsADV.exe`. Java comes with it; nothing to
+   install. Windows SmartScreen may say "Windows protected your PC" because the app isn't signed:
+   click *More info*, then *Run anyway*.
+
+Ride with the keyboard (see Controls) or plug in a game controller. Open your club's GPX files with
+*Load GPX file...*; they're remembered in `%USERPROFILE%\.nwadv`, along with the downloaded map
+data, and your settings and progress are in `%USERPROFILE%\.prefs`.
+
 ## Building
 
 The Android APK is built by GitHub Actions on every push (*Actions → Build → artifacts →

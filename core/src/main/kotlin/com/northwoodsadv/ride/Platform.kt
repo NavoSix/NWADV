@@ -7,6 +7,9 @@ interface Platform {
     /** Directory for downloaded map data. Survives app restarts. */
     val mapCacheDir: File
 
+    /** Where GPX files the rider opened are kept for the route list, or null for the app's local storage. */
+    val savedRoutesDir: File? get() = null
+
     /** True on phones/tablets: shows on-screen controls and enables tilt steering. */
     val isTouchDevice: Boolean
 

@@ -27,6 +27,15 @@ dependencies {
     }
 }
 
+// The game's assets (sample routes, engine recordings) go inside the jar, so the packaged game
+// runs from any folder; libGDX finds internal files on the classpath.
+sourceSets.main {
+    resources.srcDir(rootProject.file("assets"))
+}
+tasks.processResources {
+    exclude("saved-routes/**", "cache/**", ".lwjgl/**")
+}
+
 application {
     mainClass.set("com.northwoodsadv.ride.desktop.DesktopLauncherKt")
 }

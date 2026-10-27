@@ -38,3 +38,33 @@ jobs:
         with:
           name: nwadv-desktop
           path: desktop/build/distributions/*.zip
+
+  # The desktop game for Windows, packaged with its own Java runtime: unzip and run
+  # NorthwoodsADV.exe, nothing to install.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the desktop game
+        run: ./gradlew.bat :desktop:installDist --console=plain
+
+      - name: Package with a bundled Java runtime
+        shell: pwsh
+        run: |
+          $jar = (Get-ChildItem desktop/build/install/desktop/lib/desktop-*.jar).Name
+          jpackage --type app-image --name NorthwoodsADV --input desktop/build/install/desktop/lib --main-jar $jar `
+            --main-class com.northwoodsadv.ride.desktop.DesktopLauncherKt --dest dist --java-options "-Xmx2g"
+          Compress-Archive -Path dist/NorthwoodsADV -DestinationPath NorthwoodsADV-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nwadv-windows
+          path: NorthwoodsADV-windows.zip

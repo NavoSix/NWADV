@@ -97,10 +97,10 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.beam(-0.86f, 0.87f, -0.11f, -0.86f, 0.87f, 0.11f, 0.012f, silver)
 
         // --- boxer engine: crankcase, cylinders out each side, heads, gearbox ---------------------
-        m.loft(arrayOf(st(0.42f, 0.42f, 0.10f, 0.10f), st(0.30f, 0.44f, 0.16f, 0.13f), st(0.05f, 0.45f, 0.17f, 0.13f), st(-0.08f, 0.50f, 0.12f, 0.11f)), engineBlack, ls, 0.7f)
+        m.loft(arrayOf(st(0.34f, 0.38f, 0.10f, 0.10f), st(0.24f, 0.41f, 0.15f, 0.13f), st(0.02f, 0.44f, 0.17f, 0.13f), st(-0.08f, 0.50f, 0.12f, 0.11f)), engineBlack, ls, 0.7f)
         for (s in listOf(-1f, 1f)) {
             // Cylinder (slightly ahead and up on the right, as the crank throws are offset).
-            val cx = 0.27f + s * 0.015f; val cy = 0.47f
+            val cx = 0.18f + s * 0.015f; val cy = 0.40f
             m.rod(cx, cy, s * 0.11f, cx, cy, s * 0.31f, 0.072f, 0.072f, engineBlack)
             if (hi) for (k in 0 until 6) m.rod(cx, cy, s * (0.14f + k * 0.03f), cx, cy, s * (0.152f + k * 0.03f), 0.084f, 0.084f, grey)   // fins
             // Head with the silver valve cover and the black guard.
@@ -111,9 +111,9 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             // Intake from the head up and back to the airbox.
             m.rod(cx - 0.05f, cy + 0.06f, s * 0.33f, 0.02f, 0.70f, s * 0.13f, 0.03f, 0.024f, black)
             // Header from the bottom of the head, forward, down and under.
-            m.pipe(arrayOf(floatArrayOf(cx + 0.06f, cy - 0.05f, 0.34f), floatArrayOf(0.43f, 0.32f, 0.30f), floatArrayOf(0.40f, 0.22f, 0.16f), floatArrayOf(0.15f, 0.21f, 0.08f)), s, 0.022f, steel)
+            m.pipe(arrayOf(floatArrayOf(cx + 0.06f, cy - 0.05f, 0.34f), floatArrayOf(0.33f, 0.30f, 0.30f), floatArrayOf(0.35f, 0.235f, 0.16f), floatArrayOf(0.15f, 0.235f, 0.08f)), s, 0.022f, steel)
         }
-        m.pipe(arrayOf(floatArrayOf(0.15f, 0.21f, 0.08f), floatArrayOf(-0.12f, 0.26f, 0.14f), floatArrayOf(-0.30f, 0.40f, 0.20f)), 1f, 0.03f, steel)  // collector to the muffler
+        m.pipe(arrayOf(floatArrayOf(0.15f, 0.235f, 0.08f), floatArrayOf(-0.12f, 0.27f, 0.14f), floatArrayOf(-0.30f, 0.40f, 0.20f)), 1f, 0.03f, steel)  // collector to the muffler
         m.box(0.0f, 0.62f, 0f, 0.14f, 0.08f, 0.10f, engineBlack)                                         // airbox / gearbox top
         // Aluminium skid plate.
         m.box(0.24f, 0.205f, 0f, 0.22f, 0.012f, 0.14f, alu)
@@ -148,12 +148,13 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         }
 
         // --- beak and headlight -----------------------------------------------------------------
-        m.loft(arrayOf(st(0.46f, 0.84f, 0.05f, 0.11f), st(0.62f, 0.76f, 0.045f, 0.085f), st(0.78f, 0.67f, 0.03f, 0.055f)), blue, ls, 0.7f)
-        m.loft(arrayOf(st(0.58f, 0.74f, 0.02f, 0.07f), st(0.78f, 0.655f, 0.015f, 0.05f)), black, 8, 0.8f)
-        m.box(0.58f, 0.95f, 0f, 0.04f, 0.075f, 0.11f, black)                                           // headlight housing
-        m.discX(0.61f, 0.625f, 0.95f, 0f, 0.07f, black, whiteLens, 6)                                 // LED headlight (hexagonal)
-        if (hi) for (k in -3..3) m.beam(0.63f, 0.89f, k * 0.02f, 0.63f, 1.01f, k * 0.02f, 0.0025f, black)   // mesh guard
-        for (k in -2..2) m.beam(0.632f, 0.95f + k * 0.022f, -0.075f, 0.632f, 0.95f + k * 0.022f, 0.075f, 0.003f, black)
+        // The beak runs out almost level from under the headlight to just past the front axle.
+        m.loft(arrayOf(st(0.50f, 0.865f, 0.05f, 0.115f), st(0.70f, 0.835f, 0.04f, 0.095f), st(0.86f, 0.80f, 0.028f, 0.07f), st(0.94f, 0.782f, 0.016f, 0.05f)), blue, ls, 0.7f)
+        m.loft(arrayOf(st(0.60f, 0.805f, 0.02f, 0.08f), st(0.94f, 0.762f, 0.012f, 0.05f)), black, 8, 0.8f)       // black underside
+        m.box(0.60f, 0.97f, 0f, 0.04f, 0.075f, 0.11f, black)                                           // headlight housing
+        m.discX(0.63f, 0.645f, 0.97f, 0f, 0.07f, black, whiteLens, 6)                                 // LED headlight (hexagonal)
+        if (hi) for (k in -3..3) m.beam(0.65f, 0.91f, k * 0.02f, 0.65f, 1.03f, k * 0.02f, 0.0025f, black)   // mesh guard
+        for (k in -2..2) m.beam(0.652f, 0.97f + k * 0.022f, -0.075f, 0.652f, 0.97f + k * 0.022f, 0.075f, 0.003f, black)
         m.box(0.555f, 1.04f, 0f, 0.03f, 0.03f, 0.13f, black)                                           // screen mount
 
         // --- cockpit: TFT and the CarPlay screen above it ------------------------------------
@@ -169,9 +170,9 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         for (s in listOf(-1f, 1f)) {
             m.pipe(arrayOf(floatArrayOf(0.36f, 0.96f, 0.10f), floatArrayOf(0.54f, 0.88f, 0.22f), floatArrayOf(0.56f, 0.62f, 0.26f),
                 floatArrayOf(0.40f, 0.56f, 0.28f), floatArrayOf(0.12f, 0.62f, 0.25f), floatArrayOf(0.06f, 0.72f, 0.15f)), s, 0.012f, silver)
-            m.pipe(arrayOf(floatArrayOf(0.45f, 0.70f, 0.14f), floatArrayOf(0.48f, 0.56f, 0.36f), floatArrayOf(0.40f, 0.34f, 0.40f),
-                floatArrayOf(0.16f, 0.32f, 0.40f), floatArrayOf(0.06f, 0.42f, 0.34f), floatArrayOf(0.02f, 0.50f, 0.13f)), s, 0.012f, silver)
-            m.pipe(arrayOf(floatArrayOf(0.48f, 0.56f, 0.36f), floatArrayOf(0.56f, 0.62f, 0.26f)), s, 0.01f, silver)
+            m.pipe(arrayOf(floatArrayOf(0.42f, 0.68f, 0.14f), floatArrayOf(0.40f, 0.52f, 0.38f), floatArrayOf(0.33f, 0.28f, 0.44f),
+                floatArrayOf(0.06f, 0.26f, 0.44f), floatArrayOf(-0.02f, 0.38f, 0.36f), floatArrayOf(-0.04f, 0.50f, 0.13f)), s, 0.012f, silver)
+            m.pipe(arrayOf(floatArrayOf(0.40f, 0.52f, 0.38f), floatArrayOf(0.56f, 0.62f, 0.26f)), s, 0.01f, silver)
         }
 
         // --- the lighting rig: yellow pods up high, round drivers and fogs below ---------------
@@ -190,7 +191,7 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             }
             // Small fogs low on the bars.
             m.discX(0.50f, 0.55f, 0.44f, s * 0.17f, 0.028f, black, MeshBuilder.color(0xfff4d8, 0.35f))
-            m.beam(0.50f, 0.44f, s * 0.17f, 0.46f, 0.48f, s * 0.30f, 0.006f, black)                    // brackets
+            m.beam(0.50f, 0.44f, s * 0.17f, 0.39f, 0.48f, s * 0.38f, 0.006f, black)                    // brackets
             m.beam(0.55f, 0.58f, s * 0.19f, 0.52f, 0.58f, s * 0.30f, 0.008f, black)
         }
 
@@ -267,7 +268,7 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         if (hi) {
             m.bent(arrayOf(floatArrayOf(headX - 0.04f, headY + 0.08f, 0.08f), floatArrayOf(0.30f, 0.92f, 0.13f), floatArrayOf(0.12f, 0.72f, 0.14f)), 1f, 0.004f, cable)
             m.bent(arrayOf(floatArrayOf(headX - 0.04f, headY + 0.08f, 0.08f), floatArrayOf(0.32f, 0.90f, 0.13f), floatArrayOf(0.20f, 0.66f, 0.15f)), -1f, 0.004f, cable)
-            for (k in 0 until 4) m.cone(0.27f + 0.06f * (k % 2), 0.43f + 0.06f * (k / 2), 0.44f, 0.006f, 0.006f, 0.004f, 6, bolt)
+            for (k in 0 until 4) m.cone(0.16f + 0.06f * (k % 2), 0.36f + 0.06f * (k / 2), 0.44f, 0.006f, 0.006f, 0.004f, 6, bolt)
         }
     }
 

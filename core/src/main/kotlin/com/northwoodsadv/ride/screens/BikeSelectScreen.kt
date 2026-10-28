@@ -172,19 +172,27 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
             val current = paintOf(bike)
             val gap = u * 0.6f
             val bh = u * 4.2f
-            // One row if every name fits beside its swatch, else two.
+            // Named buttons in one row if every name fits beside its swatch; otherwise just the
+            // swatches, with the chosen scheme's name after them (two rows would hide the bike).
             val need = bike.paints.maxOf { ui.textWidth(it.label) } + bh * 0.55f + u * 2f
-            val perRow = if ((pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size >= need) bike.paints.size else (bike.paints.size + 1) / 2
-            val bw = minOf(maxOf(need, u * 12f), (pw - u * 2 - gap * (perRow - 1)) / perRow)
+            val named = (pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size >= need
+            val bw = if (named) minOf(maxOf(need, u * 12f), (pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size) else bh
+            if (!named) {
+                val name = bike.paints.firstOrNull { it.id == current }?.label ?: ""
+                val tx = px + u + bike.paints.size * (bw + gap) + u * 0.4f
+                val tw = ui.textWidth(name) + u * 1.6f
+                ui.rect(tx - u * 0.6f, py + ph - u - bh, tw, bh, Color(0f, 0f, 0f, 0.45f))
+                ui.text(name, tx + u * 0.2f, py + ph - u - bh / 2 + ui.lineHeight() / 2, Color.WHITE)
+            }
             for ((k, pt) in bike.paints.withIndex()) {
-                val bx = px + u + (k % perRow) * (bw + gap)
-                val by = py + ph - u - bh - (k / perRow) * (bh + gap)
+                val bx = px + u + k * (bw + gap)
+                val by = py + ph - u - bh
                 // Paints still to be earned: a padlock instead of the swatch, and no hint how.
                 val open = game.settings.paintUnlocked(bike.id, pt.id)
                 if (ui.button("", bx, by, bw, bh, active = pt.id == current, enabled = open) && open) game.settings.setPaint(bike.id, pt.id)
                 val sw = bh * 0.55f
-                val sx = bx + u * 0.7f; val sy = by + (bh - sw) / 2
-                ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, if (open) Color.WHITE else Color.GRAY, Align.left, ui.font, bw - sw - u * 1.8f)
+                val sx = if (named) bx + u * 0.7f else bx + (bw - sw) / 2; val sy = by + (bh - sw) / 2
+                if (named) ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, if (open) Color.WHITE else Color.GRAY, Align.left, ui.font, bw - sw - u * 1.8f)
                 ui.rect(sx - 2, sy - 2, sw + 4, sw + 4, Color.BLACK)
                 if (open) {
                     ui.rect(sx, sy + sw / 2, sw, sw / 2, swatch(pt.swatch))

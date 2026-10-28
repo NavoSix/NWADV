@@ -50,19 +50,26 @@ class AchievementsScreen(private val game: NwadvGame) : ScreenAdapter() {
         var ry = ui.h - u * 9f
         ui.text("Paint schemes", rx, ry, Color.WHITE)
         ry -= u * 2.4f
-        for (bike in Bikes.all) {
-            val list = Achievement.forBike(bike.id)
-            if (list.isEmpty()) continue
+        // Two lines a row (title, then what it took) if they all fit above the Back button,
+        // otherwise one (title, and the paint on the right).
+        val withPaints = Bikes.all.filter { Achievement.forBike(it.id).isNotEmpty() }
+        val paintCount = withPaints.sumOf { Achievement.forBike(it.id).size }
+        val twoLine = u * 2.4f + ui.lineHeight() * 2
+        val fit = (ry - u * 8f - withPaints.size * u * 2.8f) / paintCount.coerceAtLeast(1)
+        val paintRowH = minOf(twoLine, fit)
+        val two = paintRowH >= twoLine * 0.98f
+        for (bike in withPaints) {
             ui.text(bike.displayName, rx, ry, Color.LIGHT_GRAY)
             ry -= u * 1.8f
-            for (a in list) {
+            for (a in Achievement.forBike(bike.id)) {
                 val got = s.isUnlocked(a)
-                val h = u * 2.4f + ui.lineHeight() * 2
-                ui.rect(rx, ry - h + u * 0.3f, rw, h - u * 0.3f, if (got) EARNED else LOCKED)
-                ui.text(if (got) a.title else "Secret", rx + u, ry - u * 0.5f, if (got) GOLD else Color.GRAY)
-                ui.text(if (got) "${a.story}: ${a.paintName} paint" else "Keep riding to find out", rx + u, ry - u * 0.9f - ui.lineHeight(),
+                ui.rect(rx, ry - paintRowH + u * 0.3f, rw, paintRowH - u * 0.3f, if (got) EARNED else LOCKED)
+                val ty = if (two) ry - u * 0.5f else ry - (paintRowH - u * 0.3f - ui.lineHeight()) / 2
+                ui.text(if (got) a.title else "Secret", rx + u, ty, if (got) GOLD else Color.GRAY)
+                if (two) ui.text(if (got) "${a.story}: ${a.paintName} paint" else "Keep riding to find out", rx + u, ry - u * 0.9f - ui.lineHeight(),
                     if (got) Color.LIGHT_GRAY else Color.DARK_GRAY)
-                ry -= h
+                else ui.text(if (got) a.paintName else "Keep riding", rx + rw - u, ty, if (got) Color.LIGHT_GRAY else Color.DARK_GRAY, Align.right)
+                ry -= paintRowH
             }
             ry -= u
         }

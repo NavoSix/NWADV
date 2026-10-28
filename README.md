@@ -146,8 +146,8 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
     Scram 411 (white and red), and Pine Green (camouflage on the tank, side panels and fenders).
     Each is unlocked by an achievement on the road; what it takes stays a secret until you've
     done it, when a notice tells you. Pick unlocked paints in the garage; the choice is
-    remembered for each bike. Only riding the Himalayan itself counts (not auto-ride). Future
-    bikes get their own paints, earned only on that bike.
+    remembered for each bike. Only riding the Himalayan itself counts (not auto-ride). Each
+    bike's paints are earned only on that bike; see them all under **Achievements**.
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
   - 207 kg with the accessories.
   - 21"/17" spoked wheels on knobbies, 200/180 mm travel, 26.5 deg rake.
@@ -167,6 +167,8 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
     with the shaft on the left, cross-spoked 19"/17" wheels on knobbies.
   - 1,254 cc ShiftCam boxer (136 hp, 143 N m), 6-speed, about 265 kg as set up; 0-100 km/h in
     about 4.5 s with a 90 kg rider. A synthesised boxer note until Franco records the real one.
+  - Three more paint schemes to earn on the GS, kept secret until earned like the Himalayan's:
+    Triple Black, Adventure Racing Red and the 40 Years GS Edition (Austin yellow and black).
 - **Mid-weight ADV twin**: the original generic 100 hp stand-in.
 
 ### Recording a bike's engine

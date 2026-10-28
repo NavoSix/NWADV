@@ -5,7 +5,31 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Franco's BMW R 1250 GS in Style Rallye (racing blue, black tank shrouds with red and white
+ * BMW's paint schemes for the R 1250 GS, as colours for the tank top, side fairings and beak
+ * ([top]), the tank shrouds, the two flashes on them, the GS lettering and the frames. [id] is
+ * what settings store.
+ */
+enum class GSPaint(
+    val id: String, val label: String,
+    val top: Int, val shroud: Int, val flash1: Int, val flash2: Int, val lettering: Int,
+    val frame: Int, val rearFrame: Int,
+) {
+    /** Racing blue, black shrouds with red and white flashes: the bike as Franco has it. */
+    RALLYE("rallye", "Style Rallye", 0x1f5aa8, 0x121315, 0xc81e2a, 0xeeeeec, 0x5a5d62, 0x121315, 0xb8bbc0),
+    /** Blackstorm metallic on black, dark grey accents, black frames. */
+    TRIPLE_BLACK("triple-black", "Triple Black", 0x1b1c20, 0x0f1012, 0x3c3f44, 0x55585e, 0x3c3f44, 0x0f1012, 0x2a2c30),
+    /** Racing red over black, white flashes. */
+    RACING_RED("adventure-racing-red", "Adventure Racing Red", 0xc0141c, 0x121315, 0xeeeeec, 0x8a8d92, 0x8a8d92, 0x121315, 0xb8bbc0),
+    /** Austin yellow and black, as the R 80 G/S's heritage edition. */
+    FORTY_YEARS("40-years-gs", "40 Years GS Edition", 0xe8b416, 0x121315, 0xe8b416, 0xeeeeec, 0xe8b416, 0x121315, 0x2a2c30);
+
+    companion object {
+        fun byId(id: String?) = entries.firstOrNull { it.id == id } ?: RALLYE
+    }
+}
+
+/**
+ * Franco's BMW R 1250 GS in Style Rallye (other factory paint schemes via [GSPaint]) (racing blue, black tank shrouds with red and white
  * flashes), as set up: the boxer's cylinders out in the wind behind silver upper and lower crash
  * bars, a lighting rig on the bars (yellow square pods either side of the beak, round seven-LED
  * driving lights and small fogs below), the LED headlight behind a mesh guard, a tall
@@ -17,7 +41,7 @@ import kotlin.math.sin
  * [Detail.SHOWROOM] adds the small stuff: LED dots in the lights, fins and bolts, cables, straps,
  * stickers and the shock spring.
  */
-class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
+class R1250GSLook(private val detail: Detail = Detail.RIDE, private val paint: GSPaint = GSPaint.RALLYE) : BikeLook {
     // Trail 100.6 mm at 25.7 deg rake: the steering axis meets the ground 0.10 m ahead of the
     // front contact patch, and the head sits 0.98 m up that line.
     override val headX = 0.39f
@@ -36,11 +60,16 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     private val ls = if (hi) 20 else 12
     private val ts = if (hi) 12 else 7
 
-    private val blue = MeshBuilder.color(0x1f5aa8)
+    private val top = MeshBuilder.color(paint.top)
+    private val shroud = MeshBuilder.color(paint.shroud)
+    private val flash1 = MeshBuilder.color(paint.flash1)
+    private val flash2 = MeshBuilder.color(paint.flash2)
+    private val lettering = MeshBuilder.color(paint.lettering)
+    private val frame = MeshBuilder.color(paint.frame)
+    private val rearFrame = MeshBuilder.color(paint.rearFrame)
     private val blueLight = MeshBuilder.color(0x2f7fd0)
     private val black = MeshBuilder.color(0x121315)
     private val matte = MeshBuilder.color(0x1c1d20)
-    private val red = MeshBuilder.color(0xc81e2a)
     private val white = MeshBuilder.color(0xeeeeec)
     private val grey = MeshBuilder.color(0x5a5d62)
     private val silver = MeshBuilder.color(0xb8bbc0)
@@ -87,17 +116,17 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     override fun chassis(m: MeshBuilder, spec: BikeSpec) {
         val b = spec.cgToRear.toFloat()
 
-        // --- frame: black front frame, silver trellis rear frame ------------------------------
+        // --- frame: front frame and trellis rear frame (black and silver on the Rallye) ---------
         for (s in listOf(-1f, 1f)) {
-            m.beam(headX - 0.02f, headY - 0.06f, s * 0.05f, 0.12f, 0.64f, s * 0.11f, 0.022f, black)     // main frame to the gearbox
-            m.beam(0.12f, 0.64f, s * 0.11f, -0.04f, 0.50f, s * 0.11f, 0.022f, black)
-            m.beam(-0.04f, 0.50f, s * 0.11f, -0.04f, 0.36f, s * 0.11f, 0.02f, black)                 // to the swingarm pivot
-            m.beam(-0.02f, 0.66f, s * 0.11f, -0.86f, 0.87f, s * 0.11f, 0.014f, silver)                // rear frame: top rails
-            m.beam(-0.06f, 0.46f, s * 0.11f, -0.62f, 0.84f, s * 0.11f, 0.013f, silver)                // lower rails
-            m.beam(-0.30f, 0.57f, s * 0.11f, -0.30f, 0.73f, s * 0.11f, 0.011f, silver)                // trellis bracing
-            m.beam(-0.48f, 0.69f, s * 0.11f, -0.46f, 0.80f, s * 0.11f, 0.011f, silver)
+            m.beam(headX - 0.02f, headY - 0.06f, s * 0.05f, 0.12f, 0.64f, s * 0.11f, 0.022f, frame)     // main frame to the gearbox
+            m.beam(0.12f, 0.64f, s * 0.11f, -0.04f, 0.50f, s * 0.11f, 0.022f, frame)
+            m.beam(-0.04f, 0.50f, s * 0.11f, -0.04f, 0.36f, s * 0.11f, 0.02f, frame)                 // to the swingarm pivot
+            m.beam(-0.02f, 0.66f, s * 0.11f, -0.86f, 0.87f, s * 0.11f, 0.014f, rearFrame)             // rear frame: top rails
+            m.beam(-0.06f, 0.46f, s * 0.11f, -0.62f, 0.84f, s * 0.11f, 0.013f, rearFrame)             // lower rails
+            m.beam(-0.30f, 0.57f, s * 0.11f, -0.30f, 0.73f, s * 0.11f, 0.011f, rearFrame)             // trellis bracing
+            m.beam(-0.48f, 0.69f, s * 0.11f, -0.46f, 0.80f, s * 0.11f, 0.011f, rearFrame)
         }
-        m.beam(-0.86f, 0.87f, -0.11f, -0.86f, 0.87f, 0.11f, 0.012f, silver)
+        m.beam(-0.86f, 0.87f, -0.11f, -0.86f, 0.87f, 0.11f, 0.012f, rearFrame)
 
         // --- boxer engine: crankcase, cylinders out each side, heads, gearbox ---------------------
         m.loft(arrayOf(st(0.34f, 0.38f, 0.10f, 0.10f), st(0.24f, 0.41f, 0.15f, 0.13f), st(0.02f, 0.44f, 0.17f, 0.13f), st(-0.08f, 0.50f, 0.12f, 0.11f)), engineBlack, ls, 0.7f)
@@ -127,18 +156,18 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
         m.rod(-0.30f, 0.42f, 0.22f, -0.40f, 0.46f, 0.225f, 0.078f, 0.078f, matte)
         m.rod(-0.78f, 0.62f, 0.23f, -0.82f, 0.64f, 0.23f, 0.045f, 0.04f, matte, MeshBuilder.color(0x0a0a0a))
 
-        // --- tank: racing blue on top, black shrouds down the sides with the red/white flash ------
-        m.loft(arrayOf(st(0.44f, 0.97f, 0.05f, 0.13f), st(0.34f, 1.0f, 0.09f, 0.19f), st(0.16f, 1.0f, 0.09f, 0.19f), st(0.02f, 0.96f, 0.06f, 0.14f)), blue, ls, 0.6f)
+        // --- tank: paint on top, shrouds down the sides with the two flashes ---------------------
+        m.loft(arrayOf(st(0.44f, 0.97f, 0.05f, 0.13f), st(0.34f, 1.0f, 0.09f, 0.19f), st(0.16f, 1.0f, 0.09f, 0.19f), st(0.02f, 0.96f, 0.06f, 0.14f)), top, ls, 0.6f)
         m.box(0.40f, 1.06f, 0f, 0.03f, 0.008f, 0.07f, black)                                            // tank-top vent
         m.cone(0.20f, 1.085f, 0f, 0.05f, 0.05f, 0.008f, ls, MeshBuilder.color(0x2a2a2a))                  // filler cap
         for (s in listOf(-1f, 1f)) {
             val z = s * 0.205f
-            m.loft(arrayOf(st(0.55f, 0.80f, 0.11f, 0.03f), st(0.40f, 0.80f, 0.18f, 0.045f), st(0.16f, 0.80f, 0.17f, 0.045f), st(0.02f, 0.85f, 0.10f, 0.03f)), black, if (hi) 14 else 8, 0.8f, z)
+            m.loft(arrayOf(st(0.55f, 0.80f, 0.11f, 0.03f), st(0.40f, 0.80f, 0.18f, 0.045f), st(0.16f, 0.80f, 0.17f, 0.045f), st(0.02f, 0.85f, 0.10f, 0.03f)), shroud, if (hi) 14 else 8, 0.8f, z)
             val o = s * 0.252f
-            // Red and white flashes toward the back of the shroud, grey GS lettering ahead.
-            m.box(0.10f, 0.76f, o, 0.035f, 0.075f, 0.003f, red)
-            m.box(0.16f, 0.76f, o, 0.022f, 0.075f, 0.003f, white)
-            m.box(0.28f, 0.86f, o, 0.07f, 0.03f, 0.003f, grey)
+            // Two flashes toward the back of the shroud (red and white on the Rallye), GS lettering ahead.
+            m.box(0.10f, 0.76f, o, 0.035f, 0.075f, 0.003f, flash1)
+            m.box(0.16f, 0.76f, o, 0.022f, 0.075f, 0.003f, flash2)
+            m.box(0.28f, 0.86f, o, 0.07f, 0.03f, 0.003f, lettering)
             // BMW roundel.
             m.discZ(0.40f, 0.78f, o, s * 0.255f, 0.035f, black)
             m.discZ(0.40f, 0.78f, s * 0.255f, s * 0.257f, 0.026f, white)
@@ -146,13 +175,13 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
             m.box(0.392f, 0.773f, s * 0.258f, 0.009f, 0.009f, 0.001f, blueLight)
             // Radiators either side of the beak.
             m.box(0.50f, 0.68f, s * 0.165f, 0.04f, 0.12f, 0.05f, matte)
-            m.box(0.47f, 0.92f, s * 0.15f, 0.06f, 0.05f, 0.05f, blue)                                     // side fairing above them
+            m.box(0.47f, 0.92f, s * 0.15f, 0.06f, 0.05f, 0.05f, top)                                      // side fairing above them
             m.box(0.52f, 0.93f, s * 0.20f, 0.04f, 0.02f, 0.002f, white)                                 // R1250 decal
         }
 
         // --- beak and headlight -----------------------------------------------------------------
         // The beak runs out almost level from under the headlight to just past the front axle.
-        m.loft(arrayOf(st(0.50f, 0.865f, 0.05f, 0.115f), st(0.70f, 0.835f, 0.04f, 0.095f), st(0.86f, 0.80f, 0.028f, 0.07f), st(0.94f, 0.782f, 0.016f, 0.05f)), blue, ls, 0.7f)
+        m.loft(arrayOf(st(0.50f, 0.865f, 0.05f, 0.115f), st(0.70f, 0.835f, 0.04f, 0.095f), st(0.86f, 0.80f, 0.028f, 0.07f), st(0.94f, 0.782f, 0.016f, 0.05f)), top, ls, 0.7f)
         m.loft(arrayOf(st(0.60f, 0.805f, 0.02f, 0.08f), st(0.94f, 0.762f, 0.012f, 0.05f)), black, 8, 0.8f)       // black underside
         m.box(0.60f, 0.97f, 0f, 0.04f, 0.075f, 0.11f, black)                                           // headlight housing
         m.discX(0.63f, 0.645f, 0.97f, 0f, 0.07f, black, whiteLens, 6)                                 // LED headlight (hexagonal)

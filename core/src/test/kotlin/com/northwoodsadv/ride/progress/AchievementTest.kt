@@ -15,9 +15,10 @@ class AchievementTest {
     }
 
     /** Ride [seconds] at [speed]; returns everything unlocked on the way. */
-    private fun ride(t: AchievementTracker, seconds: Double, speed: Double, water: Boolean = false, classVI: Boolean = false, own: Boolean = true): List<Achievement> {
+    private fun ride(t: AchievementTracker, seconds: Double, speed: Double, water: Boolean = false, classVI: Boolean = false, own: Boolean = true,
+                     night: Boolean = false, air: Boolean = false): List<Achievement> {
         val out = ArrayList<Achievement>(); var s = 0.0
-        while (s < seconds) { out += t.update(0.1, speed, water, classVI, own); s += 0.1 }
+        while (s < seconds) { out += t.update(0.1, speed, water, classVI, own, night, air); s += 0.1 }
         return out
     }
 
@@ -63,5 +64,49 @@ class AchievementTest {
         assertEquals(Achievement.WATERBORNE, Achievement.forPaint("himalayan411", "lake-blue"))
         assertEquals(null, Achievement.forPaint("himalayan411", "rock-red"))
         assertEquals(null, Achievement.forPaint("generic-twin", "lake-blue"))
+    }
+
+    @Test fun shadowRiderIsFiftyMilesAfterDark() {
+        val store = MapStore(); val gs = AchievementTracker(store, "r1250gs")
+        val miles50 = 50 * AchievementTracker.MILE
+        assertTrue(ride(gs, miles50 / 25 + 50, 25.0).isEmpty(), "daylight doesn't count")
+        assertTrue(ride(gs, miles50 / 25 - 50, 25.0, night = true).isEmpty())
+        assertEquals(listOf(Achievement.SHADOW_RIDER), ride(gs, 100.0, 25.0, night = true))
+        assertTrue(ride(AchievementTracker(store, "himalayan411"), miles50 / 25 + 50, 25.0, night = true).isEmpty(), "GS only")
+    }
+
+    @Test fun flightTimeIsOneHundredFootJump() {
+        val store = MapStore(); val gs = AchievementTracker(store, "r1250gs")
+        // 20 m/s: 1.4 s of air is 28 m, short of 100 ft (30.5 m); two of them with a landing between don't add up.
+        assertTrue(ride(gs, 1.4, 20.0, air = true).isEmpty())
+        ride(gs, 0.2, 20.0)
+        assertTrue(ride(gs, 1.4, 20.0, air = true).isEmpty(), "two short jumps aren't one long one")
+        ride(gs, 0.2, 20.0)
+        assertEquals(listOf(Achievement.FLIGHT_TIME), ride(gs, 1.7, 20.0, air = true))
+    }
+
+    @Test fun legendaryHeritageIsTenHeroSectionsInARow() {
+        val store = MapStore(); val gs = AchievementTracker(store, "r1250gs")
+        repeat(9) { assertTrue(gs.heroResult(cleared = true).isEmpty()) }
+        assertTrue(gs.heroResult(cleared = false).isEmpty(), "a failure starts the streak over")
+        assertEquals(0, gs.heroStreak)
+        // The streak carries over between rides.
+        repeat(5) { gs.heroResult(cleared = true) }
+        val next = AchievementTracker(store, "r1250gs")
+        assertEquals(5, next.heroStreak)
+        repeat(4) { assertTrue(next.heroResult(cleared = true).isEmpty()) }
+        assertEquals(listOf(Achievement.LEGENDARY_HERITAGE), next.heroResult(cleared = true))
+        assertTrue(next.heroResult(cleared = true).isEmpty(), "only once")
+        assertTrue(AchievementTracker(store, "himalayan411").let { h -> (1..10).flatMap { h.heroResult(true) } }.isEmpty(), "GS only")
+    }
+
+    @Test fun gsPaintsBelongToTheGS() {
+        assertEquals(Achievement.SHADOW_RIDER, Achievement.forPaint("r1250gs", "triple-black"))
+        assertEquals(Achievement.FLIGHT_TIME, Achievement.forPaint("r1250gs", "adventure-racing-red"))
+        assertEquals(Achievement.LEGENDARY_HERITAGE, Achievement.forPaint("r1250gs", "40-years-gs"))
+        assertEquals(null, Achievement.forPaint("r1250gs", "rallye"))
+        val ids = com.northwoodsadv.ride.bikes.Bikes.R1250GS.paints.map { it.id }
+        for (a in Achievement.forBike("r1250gs")) assertTrue(a.paint in ids, "${a.paint} is one of the GS's paints")
+        assertEquals("rallye", ids.first(), "Franco's own paint comes first")
     }
 }

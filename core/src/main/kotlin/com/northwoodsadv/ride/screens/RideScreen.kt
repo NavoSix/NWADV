@@ -273,8 +273,12 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (autoRide || bike.crash != null) { achievements.interrupt(); return }
         val gs = bike.sampleF
         val classVI = gs.road >= 0 && gs.roadBlend > 0.5 && world.roads[gs.road].spec.isClassVI
-        for (a in achievements.update(dt, bike.speed, bike.waterDepth > 0.03, classVI, game.ownRoute))
-            unlockedQueue += Card("Achievement unlocked: ${a.title}", "${a.story}. ${a.paintName} paint unlocked.", GOLD)
+        unlocked(achievements.update(dt, bike.speed, bike.waterDepth > 0.03, classVI, game.ownRoute,
+            night = day.darkness > 0.5, airborne = bike.airborne))
+    }
+
+    private fun unlocked(list: List<com.northwoodsadv.ride.progress.Achievement>) {
+        for (a in list) unlockedQueue += Card("Achievement unlocked: ${a.title}", "${a.story}. ${a.paintName} paint unlocked.", GOLD)
     }
 
     /** Hero sections: started, cleared (and milestones), or failed. */
@@ -286,9 +290,12 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             is com.northwoodsadv.ride.progress.HeroTracker.Event.Cleared -> {
                 unlockedQueue += Card("Hero section cleared!", "${settings.distance(e.hero.length)} of the worst this trail has, done clean. Hero sections cleared: ${e.total}.", HERO)
                 e.milestone?.let { unlockedQueue += Card("Achievement unlocked: ${it.title}", "${it.story}.", GOLD) }
+                unlocked(achievements.heroResult(cleared = true))
             }
-            is com.northwoodsadv.ride.progress.HeroTracker.Event.Failed ->
+            is com.northwoodsadv.ride.progress.HeroTracker.Event.Failed -> {
                 unlockedQueue += Card("Hero section failed", "${e.reason}. Ride back to either end to try it again.", FAIL)
+                achievements.heroResult(cleared = false)
+            }
             else -> {}
         }
     }

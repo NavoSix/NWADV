@@ -4,6 +4,7 @@ import com.northwoodsadv.ride.audio.EngineSound
 import com.northwoodsadv.ride.physics.BikeSpec
 import com.northwoodsadv.ride.render.BikeLook
 import com.northwoodsadv.ride.render.Detail
+import com.northwoodsadv.ride.render.GSPaint
 import com.northwoodsadv.ride.render.GenericTwinLook
 import com.northwoodsadv.ride.render.HimalayanLook
 import com.northwoodsadv.ride.render.HimalayanPaint
@@ -161,10 +162,11 @@ object Bikes {
             groundClearanceLean = Math.toRadians(44.0),
         ),
         sound = EngineSound.BOXER,
-        look = { detail, _ -> R1250GSLook(detail) },
+        look = { detail, paint -> R1250GSLook(detail, GSPaint.byId(paint)) },
         engine = "1,254 cc boxer twin",
         power = "136 hp / 143 N m",
         shortName = "R 1250 GS",
+        paints = GSPaint.entries.map { PaintOption(it.id, it.label, it.top, it.shroud) },
     )
 
     /** The original stand-in: a generic 100 hp mid-weight adventure twin. */

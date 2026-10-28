@@ -38,6 +38,7 @@ class RideSimTest {
         var t = 0.0; var crashes = 0; var crashTimer = 0.0
         var safeX = bike.x; var safeY = bike.y; var safeH = bike.yaw; var safeTimer = 0.0
         val surfaces = HashMap<Surface, Double>()
+        var jump = 0.0; var longestJump = 0.0; var longestAt = 0.0
         val maxT = (System.getenv("NWADV_RIDE_SECONDS") ?: "1800").toDouble()
         val t1 = System.nanoTime()
         var nextLog = 0.0
@@ -46,6 +47,8 @@ class RideSimTest {
             bike.update(dt, input, assists)
             tracker.update(bike.x, bike.y, dt)
             surfaces.merge(bike.surfaceF, dt, Double::plus)
+            jump = if (bike.airborne && bike.crash == null) jump + bike.speed * dt else 0.0
+            if (jump > longestJump) { longestJump = jump; longestAt = tracker.along }
             if (bike.crash != null) {
                 crashTimer += dt
                 if (crashTimer > 2) {
@@ -86,6 +89,7 @@ class RideSimTest {
         val wall = (System.nanoTime() - t1) / 1e9
         println("rode %.0f of %.0f m in %.0f s sim (%.1f s wall, %.2f ms/frame), crashes=%d, avg %.1f km/h".format(
             tracker.along, world.route.length, t, wall, wall / (t / dt) * 1000, crashes, tracker.along / t * 3.6))
+        println("longest jump %.1f m (%.0f ft) at %.0f m".format(longestJump, longestJump / 0.3048, longestAt))
         println("surfaces: " + surfaces.entries.sortedByDescending { it.value }.joinToString { "%s %.0fs".format(it.key.label, it.value) })
         assertTrue(tracker.along > world.route.length * 0.5 || t >= maxT, "made progress")
     }

@@ -21,4 +21,11 @@ class RideSaveTest {
         assertEquals("Sample_ Kancamagus Highway _approx._", RideSave.key("Sample: Kancamagus Highway (approx.).gpx"))
         assertEquals(RideSave.key("Sample: Kancamagus Highway (approx.)"), RideSave.key("Sample: Kancamagus Highway (approx.).gpx"))
     }
+
+    @Test fun keepsTheTimeOfDayAndReadsOldSaves() {
+        val s = RideSave(44.0, -71.6, 0.5, 100.0, 200.0, 7, 18.25)
+        assertEquals(18.25, RideSave.parse(s.format())!!.hours, 1e-4)
+        val old = RideSave.parse("1;44.0000000;-71.6000000;0.5000;100.0;200.0;7")!!
+        assertEquals(100.0, old.along, 0.1); kotlin.test.assertTrue(old.hours.isNaN())
+    }
 }

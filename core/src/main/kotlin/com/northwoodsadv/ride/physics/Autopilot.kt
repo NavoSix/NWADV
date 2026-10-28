@@ -29,6 +29,8 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
 
     fun drive(bike: Motorcycle, assists: Assists, input: RiderInput) {
         route.project(bike.x, bike.y, along - 50, along + 150, tmp2)
+        // Nowhere near where it was (a resumed ride, a reset after a crash): find it on the whole route.
+        if (tmp2[1] > 30) route.project(bike.x, bike.y, 0.0, Double.MAX_VALUE, tmp2)
         along = tmp2[0]
         val u = bike.forwardSpeed
 
@@ -59,9 +61,11 @@ class Autopilot(private val route: Polyline, private val ground: Ground) {
                 RoadKind.GRAVEL -> 15.0; RoadKind.CLASS_VI -> 3.5 + 4.0 * (1 - road.spec.roughness); RoadKind.TRAIL -> 4.0
                 null -> 6.0
             }
+            // Picks its way through hero sections at a crawl.
+            val hero = if (road != null && road.heroAt(gs.along) != null) 2.8 else 99.0
             val k = curvatureAt(s)
             val corner = if (k > 1e-4) sqrt(0.3 * mu * Motorcycle.G / k) else 99.0
-            val limit = min(kindMax, corner)
+            val limit = minOf(kindMax, corner, hero)
             val brake = 0.25 * mu * Motorcycle.G
             v = min(v, sqrt(limit * limit + 2 * brake * d))
             d += 10

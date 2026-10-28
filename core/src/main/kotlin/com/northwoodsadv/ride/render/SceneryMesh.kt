@@ -444,6 +444,14 @@ internal class SceneryMesh(private val ground: Ground, private val baseH: Double
                 oct(0.0, 0.4, white); oct(-0.02, 0.4, back, back = true); oct(0.004, 0.365, MeshBuilder.color(0xc41e1a))
                 text(m, listOf("STOP"), 0.008, 0.0, cy + 0.09, 0.03, white)
             }
+            PropKind.HERO_SIGN -> {
+                val orange = MeshBuilder.color(0xe8741a)
+                postAt(-0.45, 2.3, MeshBuilder.color(0x5a4a3a), 0.05f); postAt(0.45, 2.3, MeshBuilder.color(0x5a4a3a), 0.05f)
+                board(-0.7, 0.7, 1.35, 2.45, orange)
+                panel(m, 0.004, -0.66, 0.66, 1.39, 2.41, black); panel(m, 0.006, -0.63, 0.63, 1.42, 2.38, orange)
+                text(m, p.text.take(2), 0.008, 0.0, 2.32, 0.05, black, 1.3)
+                text(m, p.text.drop(2), 0.008, 0.0, 1.66, 0.03, black)
+            }
             PropKind.STREET_SIGN -> streetSign(m, p, d)
             PropKind.BROWN_SIGN, PropKind.HISTORIC_MARKER -> {
                 val lines = p.text.map { PixelFont.signName(it) }

@@ -48,6 +48,8 @@ precision mediump float;
 #endif
 #endif
 uniform vec3 u_sunDir;
+uniform vec3 u_sunCol;
+uniform vec3 u_ambCol;
 uniform vec3 u_camPos;
 uniform vec3 u_fogColor;
 uniform vec3 u_skyTop;
@@ -61,7 +63,7 @@ float vnoise(vec2 p) {
 // Haze picks up a warm glow toward the sun.
 vec3 hazeColor(vec3 view) {
     float s = max(dot(view, u_sunDir), 0.0);
-    return u_fogColor + vec3(0.20, 0.14, 0.05) * pow(s, 8.0);
+    return u_fogColor + vec3(0.20, 0.14, 0.05) * u_sunCol * pow(s, 8.0);
 }
 """
     private const val FRAG = COMMON + """
@@ -71,9 +73,26 @@ uniform float u_detail;
 uniform float u_mode;
 uniform float u_light;
 uniform float u_time;
+// The bike's lights: a spot from u_headPos along u_headDir (cosines of the hot spot and the edge
+// in u_headCone), u_headPow 0 when they're off.
+uniform vec3 u_headPos;
+uniform vec3 u_headDir;
+uniform vec2 u_headCone;
+uniform vec3 u_headCol;
+uniform float u_headPow;
 varying vec3 v_pos;
 varying vec3 v_normal;
 varying vec4 v_color;
+vec3 headLight(vec3 n) {
+    if (u_headPow <= 0.0) return vec3(0.0);
+    vec3 l = u_headPos - v_pos;
+    float d = length(l);
+    l /= max(d, 0.001);
+    float c = dot(-l, u_headDir);
+    float spot = smoothstep(u_headCone.y, u_headCone.x, c) + 0.12 * smoothstep(u_headCone.y - 0.25, u_headCone.y, c);
+    float fall = 1.0 / (1.0 + d * d / 700.0) * (1.0 - smoothstep(80.0, 150.0, d));
+    return u_headCol * (u_headPow * spot * fall * (0.35 + 0.65 * max(dot(n, l), 0.0)));
+}
 float wave(vec2 p) {
     return vnoise(p * 1.3 + vec2(u_time * 0.55, u_time * 0.32)) + 0.5 * vnoise(p * 3.1 - vec2(u_time * 0.8, -u_time * 0.45));
 }
@@ -85,7 +104,7 @@ void main() {
     vec3 base = v_color.rgb;
     float alpha = 1.0;
     float near = 1.0 - smoothstep(20.0, 120.0, dist);
-    vec3 sunCol = vec3(1.0, 0.95, 0.85);
+    vec3 sunCol = u_sunCol;
     vec3 lit;
     if (u_mode > 1.5 && u_mode < 2.5) {
         // Water.
@@ -100,7 +119,7 @@ void main() {
         vec3 sky = mix(u_canopy * 1.4, mix(u_fogColor, u_skyTop, clamp(r.y * 1.8, 0.0, 1.0)), 0.55);
         float spec = pow(max(dot(r, u_sunDir), 0.0), 90.0);
         vec3 body = base * (0.55 + 0.45 * max(u_sunDir.y, 0.0));
-        lit = mix(body, sky * u_light, clamp(fres * 0.6 + 0.1, 0.0, 1.0)) + sunCol * spec * 1.4 * u_light;
+        lit = mix(body * (u_ambCol * 0.6 + sunCol * 0.4) + base * headLight(nw) * 0.6, sky * u_light, clamp(fres * 0.6 + 0.1, 0.0, 1.0)) + sunCol * spec * 1.4 * u_light;
         alpha = clamp(0.62 + fres * 0.5, 0.0, 0.96);
     } else {
         if (u_mode < 0.5) {
@@ -119,8 +138,8 @@ void main() {
         base *= 1.0 + u_detail * (d - 0.5) * 0.4 * near;
         float sun = max(dot(n, u_sunDir) * 0.8 + 0.2, 0.0) * u_light;
         float sky = 0.5 + 0.5 * n.y;
-        vec3 amb = mix(vec3(0.24, 0.21, 0.17), vec3(0.40, 0.47, 0.60), sky) * (0.55 + 0.45 * u_light);
-        lit = base * (sunCol * sun * 1.0 + amb * 0.62);
+        vec3 amb = mix(vec3(0.24, 0.21, 0.17), vec3(0.40, 0.47, 0.60), sky) * (0.55 + 0.45 * u_light) * u_ambCol;
+        lit = base * (sunCol * sun * 1.0 + amb * 0.62 + headLight(n));
         if (u_mode > 2.5) alpha = v_color.a;
         // Objects: colour alpha below 1 marks self-lit parts (lamps), glowing at any sun angle.
         else if (u_mode > 0.5) lit = mix(lit, base * 1.1, 1.0 - v_color.a);
@@ -147,20 +166,32 @@ void main() {
 """
     private const val SKY_FRAG = COMMON + """
 uniform float u_time;
+uniform vec3 u_sunPos;
+uniform vec3 u_moonDir;
+uniform float u_stars;
 varying vec3 v_dir;
 void main() {
     vec3 d = normalize(v_dir);
     float up = max(d.y, 0.0);
     vec3 col = mix(hazeColor(d), u_skyTop, pow(smoothstep(0.0, 0.6, up), 0.7));
-    // Sun disc and glow.
-    float s = max(dot(d, u_sunDir), 0.0);
-    col += vec3(1.0, 0.9, 0.7) * (pow(s, 600.0) * 2.0 + pow(s, 40.0) * 0.18);
+    // Sun disc and glow (the real sun, which may be below the horizon).
+    float s = max(dot(d, u_sunPos), 0.0);
+    float sunUp = smoothstep(-0.05, 0.02, u_sunPos.y);
+    col += vec3(1.0, 0.9, 0.7) * (pow(s, 600.0) * 2.0 + pow(s, 40.0) * 0.18) * sunUp;
+    // Stars and the moon at night.
+    if (u_stars > 0.0 && d.y > 0.0) {
+        vec2 g = floor(vec2(atan(d.x, d.z) * 180.0, d.y * 260.0));
+        float st = step(0.9965, hash(g)) * (0.5 + 0.5 * hash(g + 7.0));
+        col += vec3(st) * u_stars * smoothstep(0.0, 0.15, d.y);
+        float m = max(dot(d, u_moonDir), 0.0);
+        col += vec3(0.85, 0.88, 0.95) * (smoothstep(0.99975, 0.99985, m) * 1.2 + pow(m, 60.0) * 0.08) * u_stars;
+    }
     // Fair-weather cumulus on a plane overhead.
     if (d.y > 0.02) {
         vec2 p = d.xz / d.y * 0.7 + vec2(u_time * 0.004, 0.0);
         float c = vnoise(p * 1.1) * 0.55 + vnoise(p * 2.7) * 0.3 + vnoise(p * 6.3) * 0.15;
         c = smoothstep(0.55, 0.8, c) * smoothstep(0.02, 0.25, d.y);
-        vec3 cloud = mix(vec3(0.78, 0.80, 0.84), vec3(1.0, 0.99, 0.96), smoothstep(0.55, 0.9, c + s * 0.3));
+        vec3 cloud = mix(vec3(0.78, 0.80, 0.84), vec3(1.0, 0.99, 0.96), smoothstep(0.55, 0.9, c + s * 0.3)) * (u_ambCol * 0.7 + u_sunCol * 0.3);
         col = mix(col, cloud, c * 0.85);
     }
     // Below the horizon (only seen past the terrain edge): haze.

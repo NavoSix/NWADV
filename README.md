@@ -62,6 +62,13 @@ New Hampshire's unmaintained Class VI roads.
   next time you open that route you pick up where you left off: the route list shows where
   you'll continue. *Back to start of route* in the pause menu starts it over, and finishing the
   route clears it.
+- **Day and night.** The sun follows its real path over northern New Hampshire for the season,
+  through golden hour and dusk to a starry night under a full moon. Pick the start time
+  (morning, afternoon, golden hour, night, dawn, or the real clock) and how fast time passes (real
+  time up to 120x) in the menu. The time of day shows above the dashboard and is saved with your
+  ride.
+- **Headlights.** Each bike throws its own beam (the GS with its auxiliary lights is the
+  brighter). Toggle them with the Lights button or L.
 - **Offline after first load.** Everything downloaded is cached, so a ride works without a
   connection the next time.
 
@@ -96,6 +103,20 @@ New Hampshire's unmaintained Class VI roads.
   streams. Fallen trees and large rocks lie across Class VI roads (and only those), at fixed
   spots so you can learn the line. Paved back roads get frost heaves and potholes; gravel roads get washboard and loose
   edges.
+- **Hero sections.** Some stretches of Class VI road get properly hard, a few hundred metres at
+  a time, marked by an orange "HERO SECTION" board at each end and drawn in orange on the GPS:
+  - The trail drops steeply into a hollow over rock steps and climbs out the other side (up to
+    about 30%).
+  - Often there's a long ford along the bottom, up to about 40 cm deep.
+  - Oversized boulders crowd alternate sides of the trail, so you pick a line between them.
+  - The rock is wet and slick, and the mud is deeper.
+
+  Ride in at either end and a banner tracks your progress. Come out of the far end without going
+  down, and without leaving the trail for more than a moment, and it counts. Each section counts
+  once per ride. The total is kept, with milestones at 1, 5, 10, 25, 50 and 100 sections cleared
+  (*Into the Rough* through *Northwoods Immortal*). See them under **Achievements** on the main
+  menu, with each bike's paint achievements (still secret until earned). Auto-ride doesn't
+  count.
 - **Rider technique.**
   - Stand on the pegs for better absorption on rough ground.
   - Shift your weight forward or back.
@@ -201,6 +222,7 @@ aired-down tyres.
 | Camera | Camera button | C |
 | Map zoom | + / - | M |
 | Auto-ride demo | Auto button | P |
+| Headlights | Lights button | L |
 
 ## Playing on Windows
 

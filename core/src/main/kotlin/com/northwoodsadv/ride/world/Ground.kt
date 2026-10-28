@@ -34,7 +34,8 @@ class GroundSample {
     var waterLevel = Double.NaN
 }
 
-class Stream(val line: Polyline, val width: Double, val river: Boolean)
+/** A stream or river; where a Class VI road fords it the water is up to [fordDepth] deep. */
+class Stream(val line: Polyline, val width: Double, val river: Boolean, val fordDepth: Double = 0.28)
 
 /**
  * The rideable world surface: real terrain (DEM) with roads graded into it, ditches, streams,
@@ -226,7 +227,7 @@ class Ground(
                 val r = bestRoad
                 if (r != null && out.roadBlend > 0.5 && (r.spec.bridge || !r.spec.isClassVI)) continue // bridge / culvert
                 val ford = r != null && out.roadBlend > 0.5
-                val depthMax = if (ford) 0.28 else if (st.river) 1.4 else 0.45
+                val depthMax = if (ford) st.fordDepth else if (st.river) 1.4 else 0.45
                 val prof = 1 - (hits[k].dist / half).let { it * it }
                 val d = depthMax * prof
                 val before = out.height
@@ -295,7 +296,10 @@ object RoadFeatures {
             val k = Noise.smoothstep(5.0, 40.0, s) * Noise.smoothstep(5.0, 40.0, r.line.length - s)
             if (k <= 0) return
             val h0 = out.height; val s0 = out.surface
-            unmaintained(r, s, lat, out, rough, seed, half)
+            val hero = r.heroAt(s)
+            val hi = hero?.intensity(s) ?: 0.0
+            unmaintained(r, s, lat, out, rough + (0.95 - rough) * hi, seed, half, hi)
+            if (hero != null && hi > 0) heroRock(hero, s, lat, out, seed, hi)
             out.height = h0 + (out.height - h0) * k
             if (k < 0.5) { out.surface = s0; out.puddle = false; out.waterDepth = 0.0 }
         } else if (spec.surface.isPaved) {
@@ -327,10 +331,25 @@ object RoadFeatures {
         }
     }
 
-    private fun unmaintained(r: Road, s: Double, lat: Double, out: GroundSample, rough: Double, seed: Int, half: Double) {
+    /**
+     * Rock steps up the pitches in and out of a hero section's hollow: slabs of ledge stacked like
+     * a staircase, each lip up to 25 cm. Dry and grippy: wet, nobody would get up them.
+     */
+    private fun heroRock(h: HeroSection, s: Double, lat: Double, out: GroundSample, seed: Int, hi: Double) {
+        if (!h.onPitch(s)) return
+        val k = floor(s / 2.6).toInt()
+        val u = s - k * 2.6 - lat * 0.18 - 0.4 * Noise.rand(k, 1, seed + 71)
+        val len = 1.4 + 0.9 * Noise.rand(k, 2, seed + 71)
+        val hgt = (0.10 + 0.15 * Noise.rand(k, 3, seed + 71)) * hi
+        out.height += hgt * Noise.smoothstep(0.0, 0.3, u) * (1 - Noise.smoothstep(len - 0.5, len, u))
+        out.surface = Surface.ROCK
+    }
+
+    /** [hero] 0..1: inside a hero section: wet rock wherever it isn't steep, more ledge, more mud. */
+    private fun unmaintained(r: Road, s: Double, lat: Double, out: GroundSample, rough: Double, seed: Int, half: Double, hero: Double = 0.0) {
         val grade = r.gradeAt(s)
         val ag = abs(grade)
-        val wet = Noise.value1(s / 70, seed + 30) > 0.55
+        val wet = (hero > 0.3 && ag < 0.12) || Noise.value1(s / 70, seed + 30) > 0.55
 
         // Two worn tyre tracks with a grassy crown between them.
         if (rough > 0.25 && half > 1.1) {
@@ -353,7 +372,7 @@ object RoadFeatures {
         if (ag > 0.10 && rough > 0.4 && out.surface == Surface.DIRT) out.surface = Surface.GRAVEL_LOOSE
 
         // Exposed ledge, often wet from seeps.
-        if (rough > 0.55 && Noise.value1(s / 45, seed + 8) > 0.68) {
+        if (rough > 0.55 && Noise.value1(s / 45, seed + 8) > 0.68 - 0.35 * hero) {
             out.surface = if (wet) Surface.WET_ROCK else Surface.ROCK
             val k = floor(s / 3.2).toInt()
             val u = s - (k + 0.2 * Noise.rand(k, 1, seed + 9)) * 3.2 - lat * 0.25
@@ -386,7 +405,7 @@ object RoadFeatures {
         // Mud holes in flat, low spots.
         val curvature = r.heightAt(s + 10) + r.heightAt(s - 10) - 2 * r.heightAt(s)
         val wetSpot = Noise.value1(s / 32, seed + 10) * (0.4 + rough * 0.6) +
-            0.5 * Noise.smoothstep(0.05, 0.4, curvature) + 0.15 * (1 - Noise.smoothstep(0.02, 0.06, ag)) - 0.78
+            0.5 * Noise.smoothstep(0.05, 0.4, curvature) + 0.15 * (1 - Noise.smoothstep(0.02, 0.06, ag)) - 0.78 + 0.3 * hero
         // Water drains off steep pitches, so mud only collects on gentle grades.
         if (wetSpot > 0 && ag < 0.10) {
             val m = minOf(1.0, wetSpot / 0.2) * (1 - Noise.smoothstep(0.06, 0.10, ag))

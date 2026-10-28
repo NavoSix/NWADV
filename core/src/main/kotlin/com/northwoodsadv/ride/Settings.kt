@@ -47,6 +47,11 @@ class Settings : com.northwoodsadv.ride.progress.ProgressStore {
     override fun isUnlocked(a: com.northwoodsadv.ride.progress.Achievement) = prefs.getBoolean("unlocked.${a.id}", false)
     override fun unlock(a: com.northwoodsadv.ride.progress.Achievement) { prefs.putBoolean("unlocked.${a.id}", true) }
     override fun flush() { prefs.flush() }
+    /** How fast the day goes by: 1 = real time. */
+    var timeSpeed = prefs.getFloat("timeSpeed", 30f).toDouble()
+    /** Time of day a ride starts at (hours), or -1 for the clock on the wall. */
+    var startHour = prefs.getFloat("startHour", 9f).toDouble()
+    var headlights = prefs.getBoolean("headlights", true)
     var camera = runCatching { CameraMode.valueOf(prefs.getString("camera", CameraMode.CHASE.name)) }.getOrDefault(CameraMode.CHASE)
     val assists = Assists(
         steerMode = runCatching { SteerMode.valueOf(prefs.getString("steerMode", SteerMode.LEAN.name)) }.getOrDefault(SteerMode.LEAN),
@@ -64,6 +69,9 @@ class Settings : com.northwoodsadv.ride.progress.ProgressStore {
         prefs.putBoolean("gpsCollapsed", gpsCollapsed)
         prefs.putString("season", season.name)
         prefs.putString("camera", camera.name)
+        prefs.putFloat("timeSpeed", timeSpeed.toFloat())
+        prefs.putFloat("startHour", startHour.toFloat())
+        prefs.putBoolean("headlights", headlights)
         prefs.putString("bike", bikeId)
         prefs.putString("steerMode", assists.steerMode.name)
         prefs.putBoolean("absFront", assists.absFront)

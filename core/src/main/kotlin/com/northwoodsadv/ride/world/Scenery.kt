@@ -15,6 +15,8 @@ enum class PropKind(val solid: Boolean) {
     BROWN_SIGN(false),
     /** New Hampshire's green historical highway marker. */
     HISTORIC_MARKER(false),
+    /** Orange board at each end of a hero section. */
+    HERO_SIGN(false),
     ERRATIC(true), MONUMENT(true), TOWER(true),
 }
 

@@ -29,6 +29,13 @@ class NavScreen(
 )
 
 /**
+ * The bike's lighting at night: where the lamps sit (model space, roughly the headlight lens),
+ * how wide the beam spreads (degrees from the centre to the edge), its colour and strength.
+ * Auxiliary lights widen and brighten it.
+ */
+class Headlight(val x: Float, val y: Float, val spreadDeg: Float = 24f, val color: Int = 0xfff2e0, val power: Float = 1f)
+
+/**
  * How one motorcycle looks. Model space: +X forward, +Y up, +Z to the rider's right, origin on
  * the ground below the centre of mass at static sag; front axle at (cgToFront, frontRadius),
  * rear axle at (-cgToRear, rearRadius).
@@ -44,6 +51,8 @@ interface BikeLook {
     val headY: Float
     val rakeDeg: Double
     val rider: RiderFit
+    /** Lights for riding at night. */
+    val headlight: Headlight get() = Headlight(0.64f, 0.95f)
     /** Where the moving map goes in the helmet view, or null to keep it on the HUD. */
     val navScreen: NavScreen? get() = null
 

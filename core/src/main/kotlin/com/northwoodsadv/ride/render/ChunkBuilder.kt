@@ -407,7 +407,7 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
         roadsideGrass(d, ms)
     }
 
-    /** Logs and rocks on Class VI roads whose position falls inside this chunk. */
+    /** Logs and rocks on Class VI roads (and hero sections' boulders) whose position falls inside this chunk. */
     internal fun trailObstacles(d: ChunkData, m: MeshBuilder) {
         val o = TrailObstacles.Obstacle()
         val p = DoubleArray(3)
@@ -449,6 +449,17 @@ class ChunkBuilder(private val ground: Ground, private val baseH: Double, var se
                     m.blob((cx - d.e0).toFloat(), gy.toFloat(), (-(cy - d.n0)).toFloat(), o.r.toFloat(), o.h.toFloat(), (o.r * 0.9).toFloat(),
                         Palette.shade(0x84847c, 0.9 + 0.2 * Noise.rand(k, ri, 5)), o.s.toFloat())
                 }
+            }
+            // Hero sections' oversized boulders, darker with wet moss.
+            val rk = com.northwoodsadv.ride.world.HeroSections.Rock()
+            for (j in com.northwoodsadv.ride.world.HeroSections.rockSlots(road)) {
+                if (!com.northwoodsadv.ride.world.HeroSections.rock(road, j, rk)) continue
+                road.line.pointAt(rk.s, p)
+                val cx = p[0] - kotlin.math.sin(p[2]) * rk.lat; val cy = p[1] + kotlin.math.cos(p[2]) * rk.lat
+                if (cx < d.e0 || cx >= d.e0 + d.size || cy < d.n0 || cy >= d.n0 + d.size) continue
+                val gy = ground.height(cx, cy, false) - baseH
+                m.blob((cx - d.e0).toFloat(), (gy - 0.08).toFloat(), (-(cy - d.n0)).toFloat(), rk.r.toFloat(), (rk.h + 0.08).toFloat(), (rk.r * 0.85).toFloat(),
+                    Palette.shade(if (Noise.rand(j, ri, 7) < 0.4) 0x6a7260 else 0x7c7c74, 0.85 + 0.2 * Noise.rand(j, ri, 6)), rk.s.toFloat())
             }
         }
     }

@@ -26,6 +26,8 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
 
     private val lines: List<MapLine>
     private val routeXs: FloatArray
+    /** Hero sections, drawn in orange over the roads. */
+    private val heroLines: List<MapLine>
     private val routeYs: FloatArray
     private val crumbX = FloatArray(4000); private val crumbY = FloatArray(4000)
     private var crumbs = 0; private var crumbHead = 0
@@ -37,6 +39,15 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         for (r in world.roads) out += mapLine(r.line.xs, r.line.ys, r.spec.kind, false)
         for (s in world.ground.streams) out += mapLine(s.line.xs, s.line.ys, null, true)
         lines = out
+        val p = DoubleArray(3)
+        heroLines = world.roads.flatMap { r ->
+            r.heroes.map { h ->
+                val n = (h.length / 6).toInt() + 1
+                val xs = DoubleArray(n + 1); val ys = DoubleArray(n + 1)
+                for (i in 0..n) { r.line.pointAt(h.s0 + h.length * i / n, p); xs[i] = p[0]; ys[i] = p[1] }
+                mapLine(xs, ys, null, false)
+            }
+        }
         val rl = world.route.resample(8.0)
         routeXs = FloatArray(rl.size) { rl.xs[it].toFloat() }; routeYs = FloatArray(rl.size) { rl.ys[it].toFloat() }
     }
@@ -118,6 +129,12 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
             if (abs(ax - bx) > reach && abs(routeXs[i + 1] - bx) > reach) continue
             if (abs(ay - by) > reach && abs(routeYs[i + 1] - by) > reach) continue
             sh.rectLine(sx(ax, ay), sy(ax, ay), sx(routeXs[i + 1], routeYs[i + 1]), sy(routeXs[i + 1], routeYs[i + 1]), ui.u * 0.55f)
+        }
+        sh.color = HERO
+        for (l in heroLines) {
+            if (l.maxX < bx - reach || l.minX > bx + reach || l.maxY < by - reach || l.minY > by + reach) continue
+            for (i in 0 until l.xs.size - 1)
+                sh.rectLine(sx(l.xs[i], l.ys[i]), sy(l.xs[i], l.ys[i]), sx(l.xs[i + 1], l.ys[i + 1]), sy(l.xs[i + 1], l.ys[i + 1]), ui.u * 0.4f)
         }
         sh.color = CRUMB
         for (k in 1 until crumbs) {
@@ -247,6 +264,7 @@ class GpsUnit(private val world: World, private val tracker: RouteTracker, priva
         private val PEAK = Color(0.35f, 0.3f, 0.25f, 1f)
         private val POI_TEXT = Color(0.3f, 0.2f, 0.1f, 1f)
         private val CRUMB = Color(0.15f, 0.45f, 0.95f, 0.85f)
+        private val HERO = Color(1f, 0.55f, 0.1f, 0.95f)
         private val ARROW = Color(0.95f, 0.25f, 0.15f, 1f)
         private val CASING = Color(0.55f, 0.55f, 0.55f, 1f)
         private val HIGHWAY = Color(0.98f, 0.8f, 0.35f, 1f)

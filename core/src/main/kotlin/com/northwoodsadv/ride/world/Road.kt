@@ -32,6 +32,8 @@ class Road(
     val halfWidth = spec.width / 2
     private val profile: FloatArray
     private val bank: FloatArray
+    /** The hard stretches of a Class VI road (see [HeroSections]). */
+    val heroes: List<HeroSection> = HeroSections.place(spec, line.length, seed)
 
     init {
         val n = floor(line.length / STEP).toInt() + 2
@@ -60,6 +62,7 @@ class Road(
             smooth = DoubleArray(n) { a + (b - a) * it / (n - 1).coerceAtLeast(1) }
         }
         profile = FloatArray(n) { smooth[it].toFloat() }
+        for (h in heroes) carveHollow(h)
 
         // Superelevation: e = v^2 / (g R), shared with side friction (about 55% carried by the
         // bank) and capped like a state DOT would. Smoothed so it runs in and out of the bend.
@@ -104,6 +107,42 @@ class Road(
             if (d >= reach) continue
             val k = 1 - Noise.smoothstep(reach * 0.25, reach, d)
             profile[i] = (profile[i] + (h - profile[i]) * k).toFloat()
+        }
+    }
+
+    /** The hero section at s, or null. */
+    fun heroAt(s: Double): HeroSection? {
+        for (h in heroes) if (s in h) return h
+        return null
+    }
+
+    /**
+     * Drops the road into a hollow with a level bottom (the stream bed, when there's a ford),
+     * going in and out over steep pitches. If that makes a pitch steeper than
+     * [HeroSections.MAX_GRADE] (a hollow on a hillside), the bottom tilts with the hill part
+     * way, then the hollow gets shallower, until it isn't.
+     */
+    private fun carveHollow(h: HeroSection) {
+        val i0 = floor(h.dipStart / STEP).toInt().coerceAtLeast(1); val i1 = (floor(h.dipEnd / STEP).toInt() + 1).coerceAtMost(profile.size - 2)
+        if (i1 <= i0) return
+        val orig = profile.copyOfRange(i0 - 1, i1 + 2)
+        val ha = heightAt(h.dipStart); val hb = heightAt(h.dipEnd)
+        var depth = h.depth; var level = 1.0
+        while (true) {
+            val flat = minOf(ha, hb) - depth
+            var worst = 0.0
+            for (i in i0..i1) {
+                val s = i * STEP
+                // Below the straight line between the hollow's two rims, or level below the lower one.
+                val chord = ha + (hb - ha) * ((s - h.dipStart) / (h.dipEnd - h.dipStart)).coerceIn(0.0, 1.0) - depth
+                val bottom = flat * level + chord * (1 - level)
+                val o = orig[i - i0 + 1].toDouble()
+                profile[i] = (o + (bottom - o) * h.dipShape(s)).toFloat()
+            }
+            for (i in i0 - 1..i1) worst = maxOf(worst, abs(profile[i + 1] - profile[i]) / STEP)
+            if (worst <= HeroSections.MAX_GRADE || depth < 0.5) break
+            for (i in i0..i1) profile[i] = orig[i - i0 + 1]
+            if (level > 0) level = maxOf(0.0, level - 0.25) else depth -= 0.3
         }
     }
 

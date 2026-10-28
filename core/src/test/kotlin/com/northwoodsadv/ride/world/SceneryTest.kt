@@ -74,8 +74,10 @@ class SceneryTest {
     fun classSixRoadsStayWild() {
         val road = Road(5, RoadSpec(RoadKind.CLASS_VI, Surface.DIRT, 3.2, 0.6, "Old Mast Road"), line(0.0, 0.0, 6000.0, 0.0), elevation)
         val (sc, b) = build(listOf(road), road.line)
-        val cosmetic = sc.props.filter { it.kind != PropKind.ERRATIC }
+        val cosmetic = sc.props.filter { it.kind != PropKind.ERRATIC && it.kind != PropKind.HERO_SIGN }
         assertTrue(cosmetic.isEmpty(), "no houses, signs or mailboxes: $cosmetic")
+        // Only the boards at each end of its hero sections.
+        assertEquals(road.heroes.size * 2, sc.props.count { it.kind == PropKind.HERO_SIGN })
         assertTrue(sc.runs.isEmpty(), "no walls, fences or rails")
         assertTrue(b.driveways.isEmpty())
     }

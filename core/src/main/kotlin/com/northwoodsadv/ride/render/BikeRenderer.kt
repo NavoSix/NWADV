@@ -21,7 +21,7 @@ import kotlin.math.sqrt
  * space: +X forward, +Y up, +Z to the rider's right, origin on the ground below the centre of
  * mass at static sag.
  */
-class BikeRenderer(private val spec: BikeSpec, private val look: BikeLook = GenericTwinLook()) : Disposable {
+class BikeRenderer(private val spec: BikeSpec, val look: BikeLook = GenericTwinLook()) : Disposable {
     private val chassisSeated: Mesh
     private val chassisStanding: Mesh
     private val chassisNoLegs: Mesh

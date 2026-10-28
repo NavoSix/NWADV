@@ -10,15 +10,18 @@ import java.util.Locale
 class RideSave(
     val lat: Double, val lon: Double, val heading: Double,
     val along: Double, val odometer: Double, val routeHash: Int,
+    /** Time of day (hours), NaN if not saved. */
+    val hours: Double = Double.NaN,
 ) {
-    fun format() = String.format(Locale.US, "1;%.7f;%.7f;%.4f;%.1f;%.1f;%d", lat, lon, heading, along, odometer, routeHash)
+    fun format() = String.format(Locale.US, "2;%.7f;%.7f;%.4f;%.1f;%.1f;%d;%.4f", lat, lon, heading, along, odometer, routeHash, hours)
 
     companion object {
         fun parse(s: String?): RideSave? {
             val f = s?.split(";") ?: return null
-            if (f.size != 7 || f[0] != "1") return null
+            if (!((f.size == 7 && f[0] == "1") || (f.size == 8 && f[0] == "2"))) return null
             return try {
-                RideSave(f[1].toDouble(), f[2].toDouble(), f[3].toDouble(), f[4].toDouble(), f[5].toDouble(), f[6].toInt())
+                RideSave(f[1].toDouble(), f[2].toDouble(), f[3].toDouble(), f[4].toDouble(), f[5].toDouble(), f[6].toInt(),
+                    if (f.size == 8) f[7].toDouble() else Double.NaN)
             } catch (_: NumberFormatException) { null }
         }
 

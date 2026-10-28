@@ -49,6 +49,8 @@ class HimalayanLook(private val detail: Detail = Detail.RIDE, private val paint:
     // The phone in its Quad Lock mount above the gauges (landscape, upright, frame-mounted):
     // the lit display just in front of the phone body.
     override val navScreen = NavScreen(0.4795f, 1.215f, 0f, 0.150f, 0.080f)
+    // The stock round headlight: a warm, fairly narrow beam.
+    override val headlight = Headlight(0.645f, 0.96f, 22f, 0xfff0d8, 1.0f)
 
     private val hi = detail == Detail.SHOWROOM
     /** Facets around lofted shells and round tubes. */

@@ -118,6 +118,7 @@ class WorldBuilder(private val cache: DiskCache) {
             Road.splitLong(xs, ys).map { Stream(it, width, ww == "river") }
         }.flatten().toMutableList()
         devStreams(route, streams)
+        streams += HeroSections.streams(roads)
         val areas = osm.areas.mapNotNull { a ->
             val code = Landcover.codeFor(a.tags) ?: return@mapNotNull null
             val rings = (a.outers + a.inners).map { ring ->
@@ -294,7 +295,7 @@ class WorldBuilder(private val cache: DiskCache) {
             }
             val tmp = DoubleArray(3); route.pointAt(0.0, tmp)
             val ahead = route.pointAt(minOf(25.0, route.length), DoubleArray(3))
-            return World(gpx.name, proj, route, Ground(elev, roads), gpx, emptyList(), tmp[0], tmp[1], atan2(ahead[1] - tmp[1], ahead[0] - tmp[0]))
+            return World(gpx.name, proj, route, Ground(elev, roads, HeroSections.streams(roads)), gpx, emptyList(), tmp[0], tmp[1], atan2(ahead[1] - tmp[1], ahead[0] - tmp[0]))
         }
     }
 }

@@ -39,7 +39,7 @@ class DesktopPlatform(touch: Boolean = false) : Platform {
  * The screenshot options are for automated visual checks. Development extras: --no-hud,
  * --start-at <route m>, --start-road-at [<road>:]<m>, --dev-streams <route m,...>,
  * --bike <id>, --paint <id>, --unlock-all, --garage, --osm-file <saved Overpass JSON>, --dump-scenery,
- * --start-turn <degrees>, --clean-hud (no route title or load notes).
+ * --start-turn <degrees>, --clean-hud (no route title or load notes), --hour <time of day>.
  */
 fun main(args: Array<String>) {
     var gpx: String? = null
@@ -63,6 +63,7 @@ fun main(args: Array<String>) {
             "--start-at" -> System.setProperty("nwadv.startAt", args[++i])
             "--start-road-at" -> System.setProperty("nwadv.startRoadAt", args[++i])
             "--no-hud" -> System.setProperty("nwadv.noHud", "1")
+            "--hour" -> System.setProperty("nwadv.hour", args[++i])
             "--clean-hud" -> System.setProperty("nwadv.cleanHud", "1")
             "--dev-streams" -> System.setProperty("nwadv.devStreams", args[++i])
             "--bike" -> System.setProperty("nwadv.bike", args[++i])

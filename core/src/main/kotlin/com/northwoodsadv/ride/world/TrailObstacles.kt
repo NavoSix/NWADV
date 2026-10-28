@@ -52,6 +52,7 @@ object TrailObstacles {
     }
 
     private val tl = ThreadLocal.withInitial { Obstacle() }
+    private val rockTl = ThreadLocal.withInitial { HeroSections.Rock() }
 
     /** Height added at (s, lat) on [road]; sets the surface when on top of an obstacle. */
     fun bump(road: Road, s: Double, lat: Double, out: GroundSample): Double {
@@ -79,6 +80,19 @@ object TrailObstacles {
                 val d2 = (ds * ds + dl * dl) / (o.r * o.r)
                 if (d2 < 1) {
                     val hgt = o.h * sqrt(1 - d2)
+                    if (hgt > best) { best = hgt; out.surface = Surface.ROCK }
+                }
+            }
+        }
+        if (road.heroes.isNotEmpty()) {
+            val rk = rockTl.get()
+            val j0 = floor(s / HeroSections.ROCK_SLOT).toInt()
+            for (j in j0 - 1..j0 + 1) {
+                if (!HeroSections.rock(road, j, rk)) continue
+                val ds = s - rk.s; val dl = lat - rk.lat
+                val d2 = (ds * ds + dl * dl) / (rk.r * rk.r)
+                if (d2 < 1) {
+                    val hgt = rk.h * sqrt(1 - d2)
                     if (hgt > best) { best = hgt; out.surface = Surface.ROCK }
                 }
             }

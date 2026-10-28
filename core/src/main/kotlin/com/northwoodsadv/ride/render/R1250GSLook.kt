@@ -29,6 +29,9 @@ class R1250GSLook(private val detail: Detail = Detail.RIDE) : BikeLook {
     // The Garmin, portrait on the left of the bars (steers with them), tilted back a little.
     override val navScreen = NavScreen(-0.03f, 0.29f, -0.16f, 0.072f, 0.128f, tiltDeg = 18f, onBars = true)
 
+    // LED headlight plus the driving lights, fogs and yellow pods: a wide, bright, warm spread.
+    override val headlight = Headlight(0.65f, 0.90f, 34f, 0xfff0c8, 1.7f)
+
     private val hi = detail == Detail.SHOWROOM
     private val ls = if (hi) 20 else 12
     private val ts = if (hi) 12 else 7

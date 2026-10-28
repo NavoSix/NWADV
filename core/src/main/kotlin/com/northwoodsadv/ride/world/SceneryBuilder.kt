@@ -81,6 +81,7 @@ class SceneryBuilder(
         for ((ri, r) in roads.withIndex()) {
             if (!near[ri]) continue
             if (rank(r.spec) >= 1 && !r.spec.isClassVI) guardRails(ri, r)
+            heroSigns(r)
             if (!cosmetic(r.spec)) continue
             if (!realBuildings) settlement(ri, r)
             fields(ri, r)
@@ -740,6 +741,17 @@ class SceneryBuilder(
     }
 
     // --- signs ---------------------------------------------------------------------------------
+
+    /** An orange board at each end of every hero section, facing riders about to go in. */
+    private fun heroSigns(r: Road) {
+        for (h in r.heroes) for (dir in intArrayOf(1, -1)) {
+            val s = if (dir > 0) h.s0 - 4 else h.s1 + 4
+            at(r, s, -dir * (r.halfWidth + ground.shoulder(r) + 0.8), p)
+            val travel = p[2] + if (dir > 0) 0.0 else PI
+            props += Prop(PropKind.HERO_SIGN, p[0], p[1], travel + PI, 0.05, 0.7, 2.4, r.seed + h.slot,
+                listOf("HERO", "SECTION", "%d M".format(h.length.toInt())))
+        }
+    }
 
     private fun signs(ri: Int, r: Road) {
         val rk = rank(r.spec)

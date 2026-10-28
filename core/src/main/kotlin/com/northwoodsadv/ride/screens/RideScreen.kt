@@ -75,8 +75,11 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var landmarkTimer = 0.0
     private val announced = HashSet<Landmark>()
     private val achievements = com.northwoodsadv.ride.progress.AchievementTracker(settings, model.id) // only this bike's achievements
-    /** Newly unlocked achievements, shown one at a time. */
-    private val unlockedQueue = ArrayDeque<com.northwoodsadv.ride.progress.Achievement>()
+    /** A notice at the top of the screen: achievements unlocked, hero sections cleared or failed. */
+    private class Card(val title: String, val body: String, val color: Color)
+    /** Cards waiting their turn, shown one at a time. */
+    private val unlockedQueue = ArrayDeque<Card>()
+    private val heroes = com.northwoodsadv.ride.progress.HeroTracker(settings)
     private var unlockTimer = 0.0
     /** Started from a saved spot rather than the start of the route. */
     private var resumed = false
@@ -84,8 +87,14 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private var bannerTimer = 0.0
     private var notesTimer = if (world.notes.isEmpty()) 0.0 else 9.0
     private var wasCrashed = false
-    private val sky = Palette.rgb(Palette.SKY)
-    private val haze = Palette.rgb(Palette.HAZE)
+    /** Time of day, from the setting (or the real clock), running at the chosen speed. */
+    private val day = com.northwoodsadv.ride.render.DayCycle(
+        System.getProperty("nwadv.hour")?.toDoubleOrNull() // development: --hour
+            ?: if (settings.startHour < 0) java.time.LocalTime.now().let { it.hour + it.minute / 60.0 } else settings.startHour,
+        settings.timeSpeed, com.northwoodsadv.ride.render.DayCycle.dayOfYear(settings.season))
+    private val headlight = bikeRenderer.look.headlight
+    private val headPos = com.badlogic.gdx.math.Vector3()
+    private val headDir = com.badlogic.gdx.math.Vector3()
     private val canopy = Palette.rgb(Palette.CANOPY)
     private val skyShader = WorldShader.createSky()
     private val skyQuad = com.badlogic.gdx.graphics.Mesh(true, 4, 6, com.badlogic.gdx.graphics.VertexAttribute.Position()).apply {
@@ -136,6 +145,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK)) paused = !paused
         if (Gdx.input.isKeyJustPressed(Input.Keys.C)) cycleCamera()
         if (Gdx.input.isKeyJustPressed(Input.Keys.P)) autoRide = !autoRide
+        if (Gdx.input.isKeyJustPressed(Input.Keys.L)) toggleLights()
         if (Gdx.input.isKeyJustPressed(Input.Keys.M)) gps.zoom = if (gps.zoom > 2000) 300f else gps.zoom * 2
         if (Gdx.input.isKeyJustPressed(Input.Keys.BACKSPACE)) respawn()
 
@@ -149,6 +159,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             checkLandmarks(dt.toDouble())
             handleCrash(dt.toDouble())
             trackAchievements(dt.toDouble())
+            trackHeroes(dt.toDouble())
             saveTimer += dt
             if (saveTimer > 15) saveRide()
         }
@@ -167,6 +178,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         chunks.update(chase.worldE, chase.worldN, 4500.0)
 
         if (gpsOnBike) drawNavTexture(dt)
+        if (!paused) day.update(dt.toDouble())
+        val sky = day.skyTop; val haze = day.haze; val sun = day.lightDir
         Gdx.gl.glClearColor(sky[0], sky[1], sky[2], 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         time += dt
@@ -180,7 +193,12 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
         skyShader.bind()
         skyShader.setUniformMatrix("u_invProjView", cam.invProjectionView)
-        skyShader.setUniformf("u_sunDir", SUN[0], SUN[1], SUN[2])
+        skyShader.setUniformf("u_sunDir", sun[0], sun[1], sun[2])
+        skyShader.setUniformf("u_sunCol", day.lightColor[0], day.lightColor[1], day.lightColor[2])
+        skyShader.setUniformf("u_ambCol", day.ambient[0], day.ambient[1], day.ambient[2])
+        skyShader.setUniformf("u_sunPos", day.sunDir[0], day.sunDir[1], day.sunDir[2])
+        skyShader.setUniformf("u_moonDir", day.moonDir[0], day.moonDir[1], day.moonDir[2])
+        skyShader.setUniformf("u_stars", day.stars)
         skyShader.setUniformf("u_fogColor", haze[0], haze[1], haze[2])
         skyShader.setUniformf("u_skyTop", sky[0], sky[1], sky[2])
         skyShader.setUniformf("u_time", time)
@@ -192,12 +210,16 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         shader.bind()
         shader.setUniformMatrix("u_projView", cam.combined)
         shader.setUniformf("u_useModel", 0f)
-        shader.setUniformf("u_sunDir", SUN[0], SUN[1], SUN[2])
+        shader.setUniformf("u_sunDir", sun[0], sun[1], sun[2])
+        shader.setUniformf("u_sunCol", day.lightColor[0], day.lightColor[1], day.lightColor[2])
+        shader.setUniformf("u_ambCol", day.ambient[0], day.ambient[1], day.ambient[2])
+        setHeadlight()
         shader.setUniformf("u_camPos", cam.position)
         shader.setUniformf("u_fogColor", haze[0], haze[1], haze[2])
         shader.setUniformf("u_skyTop", sky[0], sky[1], sky[2])
         shader.setUniformf("u_fogDensity", 1f / 2600f)
-        shader.setUniformf("u_canopy", canopy[0], canopy[1], canopy[2])
+        val dim = 0.25f + 0.75f * (1 - day.darkness)
+        shader.setUniformf("u_canopy", canopy[0] * dim, canopy[1] * dim, canopy[2] * dim)
         shader.setUniformf("u_canopyRange", 150f, 330f)
         shader.setUniformf("u_detail", 1f)
         shader.setUniformf("u_time", time)
@@ -231,6 +253,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         bike.reset(x, y, save.heading)
         bike.odometer = save.odometer
         tracker.resumeAt(save.along)
+        if (!save.hours.isNaN()) day.hours = save.hours
         safeX = x; safeY = y; safeHeading = save.heading
         resumed = true
     }
@@ -240,7 +263,7 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         val key = game.routeKey ?: return
         if (tracker.finished) { settings.setRideSave(key, null); return }
         settings.setRideSave(key, com.northwoodsadv.ride.RideSave(world.proj.lat(safeY), world.proj.lon(safeX), safeHeading,
-            tracker.along, bike.odometer, game.routeHash))
+            tracker.along, bike.odometer, game.routeHash, day.hours))
         saveTimer = 0.0
     }
 
@@ -250,7 +273,24 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (autoRide || bike.crash != null) { achievements.interrupt(); return }
         val gs = bike.sampleF
         val classVI = gs.road >= 0 && gs.roadBlend > 0.5 && world.roads[gs.road].spec.isClassVI
-        unlockedQueue.addAll(achievements.update(dt, bike.speed, bike.waterDepth > 0.03, classVI, game.ownRoute))
+        for (a in achievements.update(dt, bike.speed, bike.waterDepth > 0.03, classVI, game.ownRoute))
+            unlockedQueue += Card("Achievement unlocked: ${a.title}", "${a.story}. ${a.paintName} paint unlocked.", GOLD)
+    }
+
+    /** Hero sections: started, cleared (and milestones), or failed. */
+    private fun trackHeroes(dt: Double) {
+        val gs = bike.sampleR
+        val road = if (gs.road >= 0) world.roads[gs.road] else null
+        val speedAlong = bike.vx * kotlin.math.cos(gs.roadHeading) + bike.vy * kotlin.math.sin(gs.roadHeading)
+        when (val e = heroes.update(dt, road, gs.along, gs.lateral, speedAlong, bike.crash != null, autoRide)) {
+            is com.northwoodsadv.ride.progress.HeroTracker.Event.Cleared -> {
+                unlockedQueue += Card("Hero section cleared!", "${settings.distance(e.hero.length)} of the worst this trail has, done clean. Hero sections cleared: ${e.total}.", HERO)
+                e.milestone?.let { unlockedQueue += Card("Achievement unlocked: ${it.title}", "${it.story}.", GOLD) }
+            }
+            is com.northwoodsadv.ride.progress.HeroTracker.Event.Failed ->
+                unlockedQueue += Card("Hero section failed", "${e.reason}. Ride back to either end to try it again.", FAIL)
+            else -> {}
+        }
     }
 
     private fun checkLandmarks(dt: Double) {
@@ -303,6 +343,23 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             bike.reset(p[0], p[1], kotlin.math.atan2(ahead[1] - p[1], ahead[0] - p[0]))
         }
         chase.snap()
+    }
+
+    private fun toggleLights() { settings.headlights = !settings.headlights; settings.save() }
+
+    /** The bike's beam, from its lamps along the bike's heading, dipped a little. */
+    private fun setHeadlight() {
+        val on = settings.headlights
+        shader.setUniformf("u_headPow", if (on) headlight.power * day.darkness * 2.2f else 0f)
+        if (!on) return
+        headPos.set(headlight.x, headlight.y, 0f).mul(bikeM)
+        headDir.set(1f, -0.07f, 0f).rot(bikeM).nor()
+        shader.setUniformf("u_headPos", headPos)
+        shader.setUniformf("u_headDir", headDir)
+        val spread = Math.toRadians(headlight.spreadDeg.toDouble())
+        shader.setUniformf("u_headCone", kotlin.math.cos(spread * 0.45).toFloat(), kotlin.math.cos(spread).toFloat())
+        val c = headlight.color
+        shader.setUniformf("u_headCol", ((c shr 16) and 255) / 255f, ((c shr 8) and 255) / 255f, (c and 255) / 255f)
     }
 
     private fun cycleCamera() {
@@ -365,8 +422,9 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
             if (ui.button("-", gx - zb - u * 1.2f, ui.h - u * 3.5f - zb * 3, zb, zb)) gps.zoom = (gps.zoom * 1.6f).coerceAtMost(8000f)
         }
         // In the helmet view the cockpit is at the bottom of the screen, so the readout moves up.
-        if (gpsOnBike) dash.draw(ui, bike, settings.assists, ui.w - u * 27.5f, ui.h - u * 10.7f)
-        else dash.draw(ui, bike, settings.assists, if (game.platform.isTouchDevice) ui.w / 2 - u * 6f else ui.w / 2, u * 1.2f)
+        val clock = day.clock(settings.imperial)
+        if (gpsOnBike) dash.draw(ui, bike, settings.assists, ui.w - u * 27.5f, ui.h - u * 10.7f, clock, settings.headlights)
+        else dash.draw(ui, bike, settings.assists, if (game.platform.isTouchDevice) ui.w / 2 - u * 6f else ui.w / 2, u * 1.2f, clock, settings.headlights)
         controls.draw(ui)
 
         // Buttons along the top left.
@@ -379,6 +437,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         if (ui.button("Stand", bx, by, bw, bh, active = controls.standToggle)) controls.standToggle = !controls.standToggle
         bx += bw + u
         if (ui.button("Auto", bx, by, bw, bh, active = autoRide)) autoRide = !autoRide
+        bx += bw + u
+        if (ui.button("Lights", bx, by, bw, bh, active = settings.headlights)) toggleLights()
         if (!settings.assists.autoShift) {
             val sx = ui.w - u * 8f
             if (ui.button("Gear +", sx, ui.h * 0.48f + u * 9f, u * 6.5f, u * 4.2f)) controls.input.shiftUp = true
@@ -413,17 +473,29 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
         }
         // Achievement unlocked: a small card at the top, one at a time.
         if (unlockTimer <= 0 && unlockedQueue.isNotEmpty()) { unlockTimer = 6.0; game.platform.vibrate(80) }
+        // In a hero section: its name and how far through you are.
+        var cardTop = ui.h - u * 11f
+        heroes.active?.let { h ->
+            val bw = minOf(ui.w * 0.4f, u * 30f); val bh = u * 3.4f
+            val bx = (ui.w - bw) / 2; val by = cardTop - bh
+            ui.rect(bx, by, bw, bh, Color(0.08f, 0.08f, 0.1f, 0.85f))
+            ui.text("HERO SECTION  ${settings.distance(h.length * (1 - heroes.progress).coerceIn(0.0, 1.0))} to go", bx, by + bh - u * 0.6f, HERO, Align.center, ui.font, bw)
+            ui.rect(bx + u, by + u * 0.6f, bw - u * 2, u * 0.6f, Color(0.25f, 0.25f, 0.25f, 1f))
+            ui.rect(bx + u, by + u * 0.6f, (bw - u * 2) * heroes.progress.toFloat().coerceIn(0f, 1f), u * 0.6f, HERO)
+            cardTop = by - u
+        }
         val ach = unlockedQueue.firstOrNull()
         if (ach != null && unlockTimer > 0) {
             unlockTimer -= dt
             val a = minOf(1f, unlockTimer.toFloat() / 0.5f, (6f - unlockTimer.toFloat()) / 0.4f).coerceIn(0f, 1f)
-            val body = "${ach.story}. ${ach.paintName} paint unlocked."
+            val body = ach.body
             val cw = minOf(ui.w * 0.5f, u * 46f)
             val ch = u * 3.6f + ui.textHeight(body, cw - u * 2) + u * 1.2f
-            val cx = (ui.w - cw) / 2; val cy = ui.h - ch - u * 6.5f
+            val cx = (ui.w - cw) / 2; val cy = cardTop - ch
+            val col = Color(ach.color.r, ach.color.g, ach.color.b, a)
             ui.rect(cx, cy, cw, ch, Color(0.08f, 0.08f, 0.1f, 0.88f * a))
-            ui.rect(cx, cy + ch - u * 0.45f, cw, u * 0.45f, Color(0.95f, 0.72f, 0.2f, a))
-            ui.text("Achievement unlocked: ${ach.title}", cx, cy + ch - u * 1.2f, Color(0.95f, 0.72f, 0.2f, a), Align.center, ui.font, cw)
+            ui.rect(cx, cy + ch - u * 0.45f, cw, u * 0.45f, col)
+            ui.text(ach.title, cx, cy + ch - u * 1.2f, col, Align.center, ui.font, cw)
             ui.text(body, cx + u, cy + ch - u * 3.6f, Color(0.88f, 0.88f, 0.88f, a), Align.center, ui.font, cw - u * 2, true)
             if (unlockTimer <= 0) unlockedQueue.removeFirst()
         }
@@ -467,7 +539,8 @@ class RideScreen(private val game: NwadvGame, private val world: World) : Screen
     private object Ui2 { val AUTO = Color(0.6f, 0.9f, 1f, 1f) }
 
     private companion object {
-        /** Mid-morning sun from the south-east (render space: x east, y up, z south). */
-        val SUN = floatArrayOf(-0.45f, 0.75f, 0.48f)
+        val GOLD = Color(0.95f, 0.72f, 0.2f, 1f)
+        val HERO = Color(1f, 0.55f, 0.1f, 1f)
+        val FAIL = Color(0.9f, 0.35f, 0.3f, 1f)
     }
 }

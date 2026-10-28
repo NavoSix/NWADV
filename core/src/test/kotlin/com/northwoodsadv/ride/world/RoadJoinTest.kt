@@ -63,4 +63,34 @@ class RoadJoinTest {
         }
         assertTrue(worst < 0.15, "worst step along the track %.2f m per 50 cm".format(worst))
     }
+
+    /**
+     * A sharp vertex in a road's line (a switchback): crossing the inside of it, the distance
+     * along the road used to jump where the nearest segment changed, and the road's height
+     * jumped with it (a 30 cm step inside a switchback on a 21% climb on the practice trail).
+     */
+    @Test
+    fun distanceAlongIsContinuousRoundASharpBend() {
+        // 40 m east, then 45 degrees left to the north-east, points every 2.5 m.
+        val xs = ArrayList<Double>(); val ys = ArrayList<Double>()
+        for (i in 0..16) { xs += i * 2.5; ys += 0.0 }
+        for (i in 1..16) { xs += 40.0 + i * 2.5 * 0.7071; ys += i * 2.5 * 0.7071 }
+        val road = Road(1, RoadSpec(RoadKind.CLASS_VI, Surface.DIRT, 3.2, 0.6, "Switchback"),
+            Polyline(xs.toDoubleArray(), ys.toDoubleArray()), hills)
+        val ground = Ground(hills, listOf(road))
+        val gs = GroundSample()
+        val half = Math.toRadians(22.5)
+        for (lat in listOf(-1.5, -0.8, 0.8, 1.5)) {
+            // A path at a constant offset round the bend (left is positive), its corner on the bisector.
+            val cx = 40.0 - kotlin.math.tan(half) * lat; val cy = lat
+            var prev = Double.NaN; var worst = 0.0; var t = -10.0
+            while (t < 10.0) {
+                val x = if (t < 0) cx + t else cx + t * 0.7071; val y = if (t < 0) cy else cy + t * 0.7071
+                ground.sample(x, y, gs, false)
+                if (!prev.isNaN()) worst = maxOf(worst, abs(gs.along - prev))
+                prev = gs.along; t += 0.05
+            }
+            assertTrue(worst < 0.15, "distance along jumps %.2f m in 5 cm, %.1f m off the centreline".format(worst, lat))
+        }
+    }
 }

@@ -35,6 +35,8 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
     private var angle = fixedAngle ?: 2.3f
     private var dragX = Float.NaN
     private var time = 0f
+    /** The paint list is open (development: --garage-paints-open for still shots). */
+    private var paintsOpen = System.getProperty("nwadv.garagePaintsOpen") != null
     private val pad: Mesh = run {
         val m = MeshBuilder(256)
         val c = MeshBuilder.color(0x5a5048)
@@ -139,7 +141,7 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         val lh = u * 6.2f
         var ly = ui.h - u * 17f
         for ((i, b) in Bikes.all.withIndex()) {
-            if (ui.button(b.listLabel, u * 3, ly, lw, lh, active = i == selected)) selected = i
+            if (ui.button(b.listLabel, u * 3, ly, lw, lh, active = i == selected)) { selected = i; paintsOpen = false }
             ly -= lh + u
         }
 
@@ -167,32 +169,17 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         ui.text(bike.blurb, px + pw * 0.54f, py - u * 1.5f, Color(0.8f, 0.8f, 0.7f, 1f), Align.left, ui.font, pw * 0.46f, true)
         ui.text("Drag to turn", px + u, py + u * 2.5f, Color(1f, 1f, 1f, 0.6f))
 
-        // Paint schemes along the top of the preview: a swatch of the two tank colours and the name.
+        // Paint: the chosen scheme in the top corner of the preview; tap it to open the list of
+        // the bike's schemes (still-to-earn ones locked), pick one and the list folds away.
         if (bike.paints.size > 1) {
             val current = paintOf(bike)
-            val gap = u * 0.6f
-            val bh = u * 4.2f
-            // Named buttons in one row if every name fits beside its swatch; otherwise just the
-            // swatches, with the chosen scheme's name after them (two rows would hide the bike).
-            val need = bike.paints.maxOf { ui.textWidth(it.label) } + bh * 0.55f + u * 2f
-            val named = (pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size >= need
-            val bw = if (named) minOf(maxOf(need, u * 12f), (pw - u * 2 - gap * (bike.paints.size - 1)) / bike.paints.size) else bh
-            if (!named) {
-                val name = bike.paints.firstOrNull { it.id == current }?.label ?: ""
-                val tx = px + u + bike.paints.size * (bw + gap) + u * 0.4f
-                val tw = ui.textWidth(name) + u * 1.6f
-                ui.rect(tx - u * 0.6f, py + ph - u - bh, tw, bh, Color(0f, 0f, 0f, 0.45f))
-                ui.text(name, tx + u * 0.2f, py + ph - u - bh / 2 + ui.lineHeight() / 2, Color.WHITE)
-            }
-            for ((k, pt) in bike.paints.withIndex()) {
-                val bx = px + u + k * (bw + gap)
-                val by = py + ph - u - bh
-                // Paints still to be earned: a padlock instead of the swatch, and no hint how.
-                val open = game.settings.paintUnlocked(bike.id, pt.id)
-                if (ui.button("", bx, by, bw, bh, active = pt.id == current, enabled = open) && open) game.settings.setPaint(bike.id, pt.id)
-                val sw = bh * 0.55f
-                val sx = if (named) bx + u * 0.7f else bx + (bw - sw) / 2; val sy = by + (bh - sw) / 2
-                if (named) ui.text(pt.label, sx + sw + u * 0.6f, by + bh / 2 + ui.lineHeight() / 2, if (open) Color.WHITE else Color.GRAY, Align.left, ui.font, bw - sw - u * 1.8f)
+            val rowH = u * 4.2f
+            val sw = rowH * 0.55f
+            val listW = minOf(pw - u * 2, bike.paints.maxOf { ui.textWidth(it.label) } + sw + u * 4.5f)
+            val x = px + u
+            var y = py + ph - u - rowH
+            fun swatchAt(pt: com.northwoodsadv.ride.bikes.PaintOption, bx: Float, by: Float, open: Boolean) {
+                val sx = bx + u * 0.7f; val sy = by + (rowH - sw) / 2
                 ui.rect(sx - 2, sy - 2, sw + 4, sw + 4, Color.BLACK)
                 if (open) {
                     ui.rect(sx, sy + sw / 2, sw, sw / 2, swatch(pt.swatch))
@@ -206,6 +193,24 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
                     ui.rect(sx + sw * 0.32f, sy + sw * 0.75f, sw * 0.36f, sw * 0.07f, Color.GRAY)
                 }
             }
+            val chosenPaint = bike.paints.firstOrNull { it.id == current } ?: bike.paints.first()
+            ui.rect(x, y, listW, rowH, BACKING)
+            if (ui.button("", x, y, listW, rowH, active = paintsOpen)) paintsOpen = !paintsOpen
+            swatchAt(chosenPaint, x, y, true)
+            ui.text(chosenPaint.label, x + u * 1.3f + sw, y + rowH / 2 + ui.lineHeight() / 2, Color.WHITE)
+            ui.text(if (paintsOpen) "-" else "+", x + listW - u, y + rowH / 2 + ui.lineHeight() / 2, Color.LIGHT_GRAY, Align.right)
+            if (paintsOpen) {
+                for (pt in bike.paints) {
+                    if (pt.id == chosenPaint.id) continue
+                    y -= rowH + u * 0.3f
+                    // Paints still to be earned: a padlock instead of the swatch, and no hint how.
+                    val open = game.settings.paintUnlocked(bike.id, pt.id)
+                    ui.rect(x, y, listW, rowH, BACKING)
+                    if (ui.button("", x, y, listW, rowH, enabled = open) && open) { game.settings.setPaint(bike.id, pt.id); paintsOpen = false }
+                    swatchAt(pt, x, y, open)
+                    ui.text(pt.label, x + u * 1.3f + sw, y + rowH / 2 + ui.lineHeight() / 2, if (open) Color.WHITE else Color.GRAY)
+                }
+            }
         }
 
         val chosen = bike.id == game.settings.bikeId
@@ -215,6 +220,11 @@ class BikeSelectScreen(private val game: NwadvGame) : ScreenAdapter() {
         }
         if (ui.button("Back", u * 3, u * 3, lw * 0.5f, btnH)) game.toMenu()
         ui.endFrame()
+    }
+
+    private companion object {
+        /** Behind the paint list, so it reads over the bike. */
+        val BACKING = Color(0.08f, 0.1f, 0.09f, 0.9f)
     }
 
     private fun swatch(rgb: Int) = Color(((rgb shr 16) and 255) / 255f, ((rgb shr 8) and 255) / 255f, (rgb and 255) / 255f, 1f)

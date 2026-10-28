@@ -29,7 +29,8 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         when {
             System.getProperty("nwadv.garage") != null -> setScreen(com.northwoodsadv.ride.screens.BikeSelectScreen(this))
             pending != null -> openGpx(pending.first, pending.second)
-            startGpx != null -> openGpx(startGpx.substringAfterLast('/'), Gdx.files.absolute(startGpx).readString())
+            // Development: a route on the command line rides it straight away.
+            startGpx != null -> openGpx(startGpx.substringAfterLast('/'), Gdx.files.absolute(startGpx).readString(), setup = false)
             else -> setScreen(MenuScreen(this))
         }
     }
@@ -44,7 +45,11 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
         platform.takePendingGpx()?.let { openGpx(it.first, it.second) }
     }
 
-    fun openGpx(name: String, contents: String) {
+    /**
+     * A route was chosen (a sample, a GPX file, or one opened from another app): on to the ride
+     * setup (assists and conditions), or straight into the ride with [setup] false.
+     */
+    fun openGpx(name: String, contents: String, setup: Boolean = true) {
         val gpx: GpxFile = try {
             com.northwoodsadv.ride.geo.GpxParser.parse(contents, name.removeSuffix(".gpx"))
         } catch (e: Exception) {
@@ -52,6 +57,12 @@ open class NwadvGame(val platform: Platform, private val startGpx: String? = nul
             return
         }
         routes.remember(name, contents)
+        if (setup) setScreen(com.northwoodsadv.ride.screens.RideSetupScreen(this, name, contents, gpx))
+        else beginRide(name, contents, gpx)
+    }
+
+    /** Rides [gpx] (from the file [name] with [contents]), with the settings as they are. */
+    fun beginRide(name: String, contents: String, gpx: GpxFile) {
         ownRoute = !RouteLibrary.isBundled(name)
         routeKey = RideSave.key(name); routeHash = contents.hashCode()
         startRide(gpx)

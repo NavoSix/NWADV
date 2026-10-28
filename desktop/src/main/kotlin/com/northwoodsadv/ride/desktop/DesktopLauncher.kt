@@ -38,7 +38,7 @@ class DesktopPlatform(touch: Boolean = false) : Platform {
  * Usage: desktop [route.gpx] [--auto] [--size 1600x900] [--shots out-dir --shot-times 5,10,20]
  * The screenshot options are for automated visual checks. Development extras: --no-hud,
  * --start-at <route m>, --start-road-at [<road>:]<m>, --dev-streams <route m,...>,
- * --bike <id>, --paint <id>, --unlock-all, --garage, --osm-file <saved Overpass JSON>, --dump-scenery,
+ * --bike <id>, --paint <id>, --unlock-all, --garage, --garage-paints-open, --osm-file <saved Overpass JSON>, --dump-scenery,
  * --start-turn <degrees>, --clean-hud (no route title or load notes), --hour <time of day>.
  */
 fun main(args: Array<String>) {
@@ -75,6 +75,7 @@ fun main(args: Array<String>) {
             "--osm-file" -> System.setProperty("nwadv.osmFile", File(args[++i]).absolutePath)
             "--garage-angle" -> System.setProperty("nwadv.garageAngle", args[++i])
             "--garage-cam" -> System.setProperty("nwadv.garageCam", args[++i])
+            "--garage-paints-open" -> System.setProperty("nwadv.garagePaintsOpen", "1")
             else -> gpx = File(args[i]).absolutePath
         }
         i++

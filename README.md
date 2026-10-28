@@ -58,6 +58,10 @@ New Hampshire's unmaintained Class VI roads.
   - Peaks on the map, and any waypoints in your GPX file (the club's lunch stop, a gas
     station), with a brown sign by the road.
 - **Solid.** Buildings, silos, towers and big boulders stop the bike, just as trees do.
+- **Ride setup.** Choosing a route (a sample, your own GPX, or one opened from another app)
+  leads to the ride setup: the riding assists (difficulty, steering, ABS, traction and wheelie
+  control, gears, walking pace) on one tab and the conditions (season, start time, time speed)
+  on the other, then *Confirm and start*. The choices are remembered for the next ride.
 - **Saved progress.** Close the game (or go back to the menu) part way along a route and the
   next time you open that route you pick up where you left off: the route list shows where
   you'll continue. *Back to start of route* in the pause menu starts it over, and finishing the
@@ -65,7 +69,7 @@ New Hampshire's unmaintained Class VI roads.
 - **Day and night.** The sun follows its real path over northern New Hampshire for the season,
   through golden hour and dusk to a starry night under a full moon. Pick the start time
   (morning, afternoon, golden hour, night, dawn, or the real clock) and how fast time passes (real
-  time up to 120x) in the menu. The time of day shows above the dashboard and is saved with your
+  time up to 120x) in the ride setup. The time of day shows above the dashboard and is saved with your
   ride.
 - **Headlights.** Each bike throws its own beam (the GS with its auxiliary lights is the
   brighter). Toggle them with the Lights button or L.
@@ -145,7 +149,8 @@ bikes are added one at a time in `core/src/main/kotlin/.../bikes/Bikes.kt`.
   - Three more factory paint schemes to earn: Lake Blue (blue over white), White Flame from the
     Scram 411 (white and red), and Pine Green (camouflage on the tank, side panels and fenders).
     Each is unlocked by an achievement on the road; what it takes stays a secret until you've
-    done it, when a notice tells you. Pick unlocked paints in the garage; the choice is
+    done it, when a notice tells you. Pick unlocked paints in the garage (tap the paint over
+    the bike to open the list); the choice is
     remembered for each bike. Only riding the Himalayan itself counts (not auto-ride). Each
     bike's paints are earned only on that bike; see them all under **Achievements**.
   - 411 cc air/oil-cooled single (24 hp at 6,500 rpm, 32 N m at 4,000-4,500), 5-speed.
@@ -196,7 +201,7 @@ map on the HUD.
 
 ## Difficulty
 
-The **Difficulty** setting (menu) defaults to *Easy*:
+The **Difficulty** setting (ride setup, *Riding assists*) defaults to *Easy*:
 
 - **Easy** adds a stabiliser that holds the lean you ask for and shrugs off knocks from rocks and
   ruts, keeps the bike tracking where it's pointed over bumps, keeps the chassis level over
